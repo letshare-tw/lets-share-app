@@ -434,39 +434,7 @@ window.v55Handoff=function(id){let o=store.orders.find(x=>x.id===id);if(!o||o.st
 window.v55Print=function(id){let o=store.orders.find(x=>x.id===id);if(!o)return;if(o.status!=='總部已出貨'||o.shipment?.legacy)v55Save(id);let f=v55slip(o);let html=`<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${safe(f.number)}</title><style>@page{size:A4;margin:15mm}body{font:14px/1.65 system-ui,sans-serif;color:#17251e}h1{color:#07844d}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #ccc;padding:8px;text-align:left}.sum{text-align:right;font-weight:bold}.small{font-size:12px;color:#555}.actions{margin:20px 0}@media print{.actions{display:none}}</style></head><body><div class="actions"><button onclick="window.print()">列印／另存 PDF</button></div><h1>樂享家 LET'S SHARE</h1><h2>總部電子出貨單</h2><p>出貨單號：${safe(f.number)}<br>訂單編號：${safe(o.id)}<br>狀態：${safe(f.status)}</p><hr><p>收件人：${safe(f.recipient)}<br>電話：${safe(f.phone)}<br>配送方式：${safe(f.method)}<br>寄送地址／門市：${safe(f.address)}</p><table><thead><tr><th>商品編號</th><th>商品</th><th>數量</th><th>售價</th><th>核對</th></tr></thead><tbody>${o.lines.map(x=>`<tr><td>${safe(x.sku)}</td><td>${safe(x.name)}</td><td>1</td><td>NT$ ${x.price}</td><td>${f.checked.includes(x.sku)?'✓':''}</td></tr>`).join('')}</tbody></table><p class="sum">共 ${o.lines.length} 件｜商品總額 NT$ ${o.total}</p><hr><p>物流商：${safe(f.carrier||'未指定')}<br>託運單號：${safe(f.tracking||'未建立')}<br>揀貨人員：${safe(f.picker||'未指定')}　複核人員：${safe(f.checker||'未指定')}<br>交寄時間：${f.handedAt?new Date(f.handedAt).toLocaleString('zh-TW'):'尚未交寄'}</p><p class="small">${f.legacy?'⚠️ 歷史訂單事後補建；不代表原出貨時已完成核對或交寄。':''}本機模擬出貨單，非統一發票或實際託運證明。含個人資料，請妥善保管。</p>
 
 
-<script>
-/* C09: My share bags read-only RPC integration. No client-side owner filter. */
-(function(){
- const URL='https://wxvauoeykusmbxdtwgxo.supabase.co';
- const KEY='sb_publishable_ZCqKEuqpTiZ46p9fx_JXvA_av4JwD3I';
- const SESSION_KEY='lx_supabase_auth_v066g';
- const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- window.lxMyShareBagsCard=()=>'<section class="card"><h3>我的分享袋｜Supabase 即時資料</h3><p class="muted">僅讀取目前登入會員有權查看的分享袋，不顯示本機示範資料。</p><button class="secondary wide" type="button" onclick="lxLoadMyShareBags()">重新整理我的分享袋</button><div id="lx-my-share-bags-result" style="margin-top:12px" aria-live="polite">按下按鈕讀取資料。</div></section>';
- window.lxLoadMyShareBags=async function(){
-  const target=document.getElementById('lx-my-share-bags-result');if(!target)return;
-  const user=window.__lxRealAuth?.user;
-  if(!user){target.textContent='請先登入會員，再讀取自己的分享袋。';return;}
-  let session;try{session=JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null')}catch{}
-  if(!session?.token){target.textContent='登入憑證不存在，請重新登入。';return;}
-  target.textContent='正在安全讀取分享袋…';
-  try{
-   const response=await fetch(URL+'/rest/v1/rpc/lx_get_my_share_bags',{
-    method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+session.token,'Content-Type':'application/json'},
-    body:'{}',cache:'no-store'
-   });
-   const raw=await response.text();let result;try{result=raw?JSON.parse(raw):null}catch{throw Error('伺服器回傳格式無法解析');}
-   if(!response.ok)throw Error((result?.message||result?.hint||'讀取失敗')+'（HTTP '+response.status+'）');
-   const rows=Array.isArray(result)?result:(result&&Array.isArray(result.data)?result.data:[]);
-   if(!rows.length){target.textContent='目前沒有可查看的分享袋。';return;}
-   target.innerHTML='<div class="muted">查詢成功：'+rows.length+' 筆</div>'+rows.map((r,i)=>{
-    const id=r.bag_code??r.share_bag_code??r.bag_id??r.id??'第 '+(i+1)+' 筆';
-    const status=r.status??r.stage??r.bag_status??'狀態未提供';
-    return '<div style="padding:10px 0;border-bottom:1px solid #e4e9e5"><b>袋號：'+esc(id)+'</b><div class="muted">狀態：'+esc(status)+'</div></div>';
-   }).join('');
-  }catch(e){target.textContent='讀取失敗：'+(e?.message||String(e))+'。請確認 RPC 權限與登入狀態。';}
- };
-})();
-</script>
+
 </body></html>`;let w=window.open('','_blank');if(!w){alert('瀏覽器阻擋新視窗，請允許彈出式視窗後重試');return}w.document.open();w.document.write(html);w.document.close()};
 
 
@@ -1928,6 +1896,39 @@ $('lx-auth-signout').addEventListener('click',()=>run(async()=>{
     }
    }catch(e){if(current!==checkId)return;box.textContent='⚠️ 無法從後端確認角色（'+String(e.message||e)+'）。可能是 RLS 或 API 權限尚未設定；所有管理操作繼續鎖定。';}
   })();
+ };
+})();
+</script>
+<script>
+/* C09: My share bags read-only RPC integration. No client-side owner filter. */
+(function(){
+ const URL='https://wxvauoeykusmbxdtwgxo.supabase.co';
+ const KEY='sb_publishable_ZCqKEuqpTiZ46p9fx_JXvA_av4JwD3I';
+ const SESSION_KEY='lx_supabase_auth_v066g';
+ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ window.lxMyShareBagsCard=()=>'<section class="card"><h3>我的分享袋｜Supabase 即時資料</h3><p class="muted">僅讀取目前登入會員有權查看的分享袋，不顯示本機示範資料。</p><button class="secondary wide" type="button" onclick="lxLoadMyShareBags()">重新整理我的分享袋</button><div id="lx-my-share-bags-result" style="margin-top:12px" aria-live="polite">按下按鈕讀取資料。</div></section>';
+ window.lxLoadMyShareBags=async function(){
+  const target=document.getElementById('lx-my-share-bags-result');if(!target)return;
+  const user=window.__lxRealAuth?.user;
+  if(!user){target.textContent='請先登入會員，再讀取自己的分享袋。';return;}
+  let session;try{session=JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null')}catch{}
+  if(!session?.token){target.textContent='登入憑證不存在，請重新登入。';return;}
+  target.textContent='正在安全讀取分享袋…';
+  try{
+   const response=await fetch(URL+'/rest/v1/rpc/lx_get_my_share_bags',{
+    method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+session.token,'Content-Type':'application/json'},
+    body:'{}',cache:'no-store'
+   });
+   const raw=await response.text();let result;try{result=raw?JSON.parse(raw):null}catch{throw Error('伺服器回傳格式無法解析');}
+   if(!response.ok)throw Error((result?.message||result?.hint||'讀取失敗')+'（HTTP '+response.status+'）');
+   const rows=Array.isArray(result)?result:(result&&Array.isArray(result.data)?result.data:[]);
+   if(!rows.length){target.textContent='目前沒有可查看的分享袋。';return;}
+   target.innerHTML='<div class="muted">查詢成功：'+rows.length+' 筆</div>'+rows.map((r,i)=>{
+    const id=r.bag_code??r.share_bag_code??r.bag_id??r.id??'第 '+(i+1)+' 筆';
+    const status=r.status??r.stage??r.bag_status??'狀態未提供';
+    return '<div style="padding:10px 0;border-bottom:1px solid #e4e9e5"><b>袋號：'+esc(id)+'</b><div class="muted">狀態：'+esc(status)+'</div></div>';
+   }).join('');
+  }catch(e){target.textContent='讀取失敗：'+(e?.message||String(e))+'。請確認 RPC 權限與登入狀態。';}
  };
 })();
 </script>
