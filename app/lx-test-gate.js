@@ -1,7 +1,10 @@
 
 /*
- * 樂享家 DEV-03-04 v1.4
- * 穩定登入畫面、背景白名單驗證
+ * 樂享家 Let's Share
+ * DEV-03-04 v1.5
+ *
+ * 修正品牌標題置中。
+ * 保留 v1.4 登入與白名單驗證機制。
  */
 (() => {
   "use strict";
@@ -47,123 +50,204 @@
 
   function createGate() {
     const style = document.createElement("style");
+
     style.textContent = `
-      #lx-gate-v14 {
-        position:fixed; inset:0;
-        z-index:2147483000;
-        background:#078b50;
-        display:flex;
-        justify-content:center;
-        align-items:center;
-        padding:20px;
-        overflow-y:auto;
-        font-family:system-ui,"Noto Sans TC",sans-serif;
+      #lx-gate-v15 {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483000;
+        background: #078b50;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+        overflow-y: auto;
+        font-family: system-ui, "Noto Sans TC",
+          sans-serif;
       }
-      #lx-gate-v14 .wrap {
-        width:100%;max-width:410px;
-        text-align:center;
+
+      #lx-gate-v15 .wrap {
+        width: 100%;
+        max-width: 410px;
+        text-align: center;
+        margin: 0 auto;
       }
-      #lx-gate-v14 .brand-logo {
-        width:190px;max-width:60vw;
-        max-height:240px;object-fit:contain;
-        margin:0 auto 15px;
+
+      #lx-gate-v15 .brand-logo {
+        display: block;
+        width: 190px;
+        max-width: 60vw;
+        max-height: 240px;
+        object-fit: contain;
+        margin: 0 auto 15px;
       }
-      #lx-gate-v14 .brand {
-        color:white;font-size:27px;
-        font-weight:800;margin:8px 0;
+
+      #lx-gate-v15 .brand {
+        display: block;
+        width: 100%;
+        color: white;
+        font-size: 27px;
+        font-weight: 800;
+        text-align: center;
+        margin: 0 auto 8px;
+        padding: 0;
+        line-height: 1.5;
       }
-      #lx-gate-v14 .slogan {
-        color:white;margin-bottom:25px;
-        font-size:15px;
+
+      #lx-gate-v15 .slogan {
+        display: block;
+        width: 100%;
+        color: white;
+        font-size: 15px;
+        text-align: center;
+        margin: 0 auto 25px;
       }
-      #lx-gate-v14 .panel {
-        background:white;border-radius:24px;
-        padding:28px 23px;
-        box-shadow:0 12px 30px #003b202b;
+
+      #lx-gate-v15 .panel {
+        background: white;
+        border-radius: 24px;
+        padding: 28px 23px;
+        box-shadow: 0 12px 30px #003b202b;
+        text-align: center;
       }
-      #lx-gate-v14 h2 {
-        color:#203129;font-size:22px;
-        margin:0 0 12px;
+
+      #lx-gate-v15 h2 {
+        color: #203129;
+        font-size: 22px;
+        margin: 0 0 12px;
+        text-align: center;
       }
-      #lx-gate-v14 p {
-        color:#69796f;font-size:14px;
-        line-height:1.8;
+
+      #lx-gate-v15 p {
+        color: #69796f;
+        font-size: 14px;
+        line-height: 1.8;
+        text-align: center;
       }
-      #lx-gate-v14 button {
-        width:100%;padding:15px;
-        border-radius:28px;
-        margin-top:13px;
-        font-size:16px;font-weight:700;
-        cursor:pointer;
+
+      #lx-gate-v15 button {
+        display: block;
+        width: 100%;
+        padding: 15px;
+        border-radius: 28px;
+        margin-top: 13px;
+        font-size: 16px;
+        font-weight: 700;
+        cursor: pointer;
+        text-align: center;
       }
-      #lx-v14-google {
-        background:white;color:#254934;
-        border:1px solid #cbdad0;
+
+      #lx-v15-google {
+        background: white;
+        color: #254934;
+        border: 1px solid #cbdad0;
       }
-      #lx-v14-email {
-        background:#078b50;color:white;border:0;
+
+      #lx-v15-email {
+        background: #078b50;
+        color: white;
+        border: 0;
       }
-      #lx-v14-retry {
-        background:#eef5f0;color:#078b50;border:0;
+
+      #lx-v15-retry {
+        background: #eef5f0;
+        color: #078b50;
+        border: 0;
       }
-      #lx-gate-v14 .note {
-        font-size:12px;color:#819087;
-        margin-top:18px;
+
+      #lx-gate-v15 .note {
+        font-size: 12px;
+        color: #819087;
+        margin-top: 18px;
+        text-align: center;
       }
     `;
+
     document.head.appendChild(style);
 
     gate = document.createElement("div");
-    gate.id = "lx-gate-v14";
+    gate.id = "lx-gate-v15";
+
     gate.innerHTML = `
       <div class="wrap">
-        <img id="lx-v14-logo"
-             class="brand-logo"
-             alt="樂享家正式 LOGO"
-             style="display:none">
-        <div class="brand">樂享家</div>
-        <div class="slogan">分享，讓美好開始傳遞</div>
+        <img
+          id="lx-v15-logo"
+          class="brand-logo"
+          alt="樂享家正式 LOGO"
+          style="display:none"
+        >
+
+        <div class="brand">
+          樂享家
+        </div>
+
+        <div class="slogan">
+          分享，讓美好開始傳遞
+        </div>
+
         <div class="panel">
-          <h2 id="lx-v14-title">歡迎來到樂享家</h2>
-          <p id="lx-v14-msg">
+          <h2 id="lx-v15-title">
+            歡迎來到樂享家
+          </h2>
+
+          <p id="lx-v15-msg">
             登入會員，開始分享美好生活
           </p>
-          <button id="lx-v14-google" type="button">
+
+          <button
+            id="lx-v15-google"
+            type="button"
+          >
             使用 Google 帳號繼續
           </button>
-          <button id="lx-v14-email" type="button">
+
+          <button
+            id="lx-v15-email"
+            type="button"
+          >
             使用 Email 登入
           </button>
-          <button id="lx-v14-retry" type="button"
-                  style="display:none">
+
+          <button
+            id="lx-v15-retry"
+            type="button"
+            style="display:none"
+          >
             重新檢查
           </button>
+
           <div class="note">
             樂享家開發測試版 · 僅限授權帳號
           </div>
         </div>
       </div>
     `;
+
     document.body.appendChild(gate);
 
-    el("lx-v14-google").onclick = () => {
+    el("lx-v15-google").onclick = () => {
       if (typeof window.lxGoogleLogin === "function") {
         window.lxGoogleLogin();
       } else {
-        display("登入服務尚未準備完成",
-                "請重新整理頁面。", "retry");
+        display(
+          "登入服務尚未準備完成",
+          "請重新整理頁面。",
+          "retry"
+        );
       }
     };
 
-    el("lx-v14-email").onclick = () => {
-      if (typeof window.lxOpenRealLogin === "function") {
+    el("lx-v15-email").onclick = () => {
+      if (
+        typeof window.lxOpenRealLogin === "function"
+      ) {
         emailOpen = true;
         hide();
         window.lxOpenRealLogin();
       }
     };
 
-    el("lx-v14-retry").onclick = () => {
+    el("lx-v15-retry").onclick = () => {
       failures = 0;
       verifiedAt = 0;
       check(true);
@@ -172,13 +256,17 @@
 
   function display(title, message, mode) {
     gate.style.display = "flex";
-    el("lx-v14-title").textContent = title;
-    el("lx-v14-msg").textContent = message;
-    el("lx-v14-google").style.display =
+
+    el("lx-v15-title").textContent = title;
+    el("lx-v15-msg").textContent = message;
+
+    el("lx-v15-google").style.display =
       mode === "login" ? "block" : "none";
-    el("lx-v14-email").style.display =
+
+    el("lx-v15-email").style.display =
       mode === "login" ? "block" : "none";
-    el("lx-v14-retry").style.display =
+
+    el("lx-v15-retry").style.display =
       mode === "retry" ? "block" : "none";
   }
 
@@ -188,6 +276,7 @@
 
   function emailPanelVisible() {
     const panel = el("lx-auth-panel");
+
     return !!panel &&
       getComputedStyle(panel).display !== "none";
   }
@@ -202,13 +291,16 @@
 
   async function allowed(token) {
     const controller = new AbortController();
+
     const timeout = setTimeout(
-      () => controller.abort(), 12000
+      () => controller.abort(),
+      12000
     );
 
     try {
       const response = await fetch(
-        BASE + "/rest/v1/rpc/lx_can_access_test_app",
+        BASE +
+        "/rest/v1/rpc/lx_can_access_test_app",
         {
           method: "POST",
           headers: {
@@ -223,7 +315,9 @@
       );
 
       if (!response.ok) {
-        throw new Error("HTTP " + response.status);
+        throw new Error(
+          "HTTP " + response.status
+        );
       }
 
       return (await response.json()) === true;
@@ -240,7 +334,6 @@
     const token = state.token;
 
     if (!id || !token) {
-      // 避免 Auth 初始化或更新時瞬間變成空值。
       if (!authMissingSince) {
         authMissingSince = Date.now();
       }
@@ -254,7 +347,10 @@
 
       clearApproval();
 
-      if (emailOpen && emailPanelVisible()) {
+      if (
+        emailOpen &&
+        emailPanelVisible()
+      ) {
         hide();
         return;
       }
@@ -266,24 +362,31 @@
         "請登入會員帳號，開始分享美好生活。",
         "login"
       );
+
       return;
     }
 
     authMissingSince = 0;
     emailOpen = false;
 
-    const sameUser = approvedUser === id;
+    const sameUser =
+      approvedUser === id;
+
     const fresh =
       Date.now() - verifiedAt < VERIFY_INTERVAL;
 
-    if (!force && sameUser && fresh) {
-      // Token 更新不需要重新顯示審核畫面。
+    if (
+      !force &&
+      sameUser &&
+      fresh
+    ) {
       approvedToken = token;
       hide();
       return;
     }
 
-    const background = sameUser && verifiedAt > 0;
+    const background =
+      sameUser && verifiedAt > 0;
 
     checking = true;
     const thisRequest = ++requestId;
@@ -297,11 +400,11 @@
     }
 
     try {
-      const permitted = await allowed(token);
+      const permitted =
+        await allowed(token);
+
       const latest = auth();
 
-      // 驗證期間換帳號或 Token 更新，
-      // 舊請求結果不套用。
       if (
         thisRequest !== requestId ||
         latest.user?.id !== id ||
@@ -318,6 +421,7 @@
         hide();
       } else {
         clearApproval();
+
         display(
           "尚未取得測試權限",
           "此帳號不在樂享家測試白名單內。",
@@ -325,17 +429,26 @@
         );
       }
     } catch (error) {
-      console.error("[樂享家白名單]", error);
+      console.error(
+        "[樂享家白名單]",
+        error
+      );
+
       failures++;
 
-      // 已通過的會員遇到一次短暫網路錯誤，
-      // 不立即跳頁；下次再驗證。
-      if (background && failures < 2) {
-        verifiedAt = Date.now() - VERIFY_INTERVAL + 10000;
+      if (
+        background &&
+        failures < 2
+      ) {
+        verifiedAt =
+          Date.now() -
+          VERIFY_INTERVAL +
+          10000;
         return;
       }
 
       clearApproval();
+
       display(
         "暫時無法確認測試資格",
         "請檢查網路連線，再重新驗證。",
@@ -357,10 +470,12 @@
 
     setTimeout(() => {
       const logo = originalLogo();
+
       if (logo) {
-        el("lx-v14-logo").src = logo;
-        el("lx-v14-logo").style.display = "block";
+        el("lx-v15-logo").src = logo;
+        el("lx-v15-logo").style.display = "block";
       }
+
       check();
     }, 1200);
 
@@ -374,13 +489,16 @@
         emailOpen &&
         emailPanelVisible() &&
         !id
-      ) return;
+      ) {
+        return;
+      }
 
       if (
         !id ||
         !state.token ||
         id !== approvedUser ||
-        Date.now() - verifiedAt >= VERIFY_INTERVAL
+        Date.now() - verifiedAt >=
+          VERIFY_INTERVAL
       ) {
         check();
       }
