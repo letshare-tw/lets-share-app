@@ -1,233 +1,299 @@
 
 /*
- * DEV-03-04
- * 樂享家測試白名單入口驗證 v1.1
+ * 樂享家 Let's Share
+ * DEV-03-04 v1.2
+ * 正式品牌登入入口 + 測試白名單
  *
- * 修正：
- * 1. 登入視窗不再被白名單遮罩反覆覆蓋。
- * 2. 保留 Google / Email 登入流程。
- * 3. 登入成功後才向 Supabase 驗證白名單。
- * 4. 未授權或驗證失敗時不放行 APP。
- *
- * 注意：這是前端測試入口控制，
- * 正式資料安全仍須由 Supabase 後端權限保障。
+ * Google 登入直接使用現有 OAuth。
+ * 未登入時提供可操作的品牌登入畫面。
+ * 登入後向 Supabase RPC 檢查白名單。
+ * 不包含任何管理用金鑰。
  */
 
 (() => {
   "use strict";
 
-  const PROJECT_URL =
+  const URL =
     "https://wxvauoeykusmbxdtwgxo.supabase.co";
 
-  const PUBLIC_KEY =
+  const KEY =
     "sb_publishable_ZCqKEuqpTiZ46p9fx_JXvA_av4JwD3I";
 
-  const AUTH_STORE = "lx_supabase_auth_v066g";
+  const STORE = "lx_supabase_auth_v066g";
+  const RPC = "lx_can_access_test_app";
 
-  const CHECK_INTERVAL = 1500;
-  const MAX_WAIT = 12000;
+  let gate = null;
+  let busy = false;
+  let approvedId = null;
+  let approvedToken = null;
+  let lastVerified = 0;
+  let loginToolOpen = false;
 
-  let lastUserId = null;
-  let lastToken = null;
-  let checking = false;
-  let allowed = false;
-  let overlay = null;
-  let loginInProgress = false;
-  let checkSequence = 0;
+  const $ = id => document.getElementById(id);
 
-  function getSession() {
+  function session() {
     try {
       return JSON.parse(
-        sessionStorage.getItem(AUTH_STORE) || "null"
+        sessionStorage.getItem(STORE) || "null"
       );
     } catch {
       return null;
     }
   }
 
-  function getUser() {
+  function user() {
     return window.__lxRealAuth?.user || null;
   }
 
-  function isLoginPanelVisible() {
-    const panel =
-      document.getElementById("lx-auth-panel");
-
-    if (!panel) return false;
-
-    return (
-      getComputedStyle(panel).display !== "none"
-    );
+  function logoSource() {
+    // 使用原 APP 已經內建的正式 LOGO。
+    const img = document.querySelector(".splash img");
+    return img?.getAttribute("src") || "";
   }
 
-  function createOverlay() {
-    if (overlay) return overlay;
+  function ensureGate() {
+    if (gate) return gate;
 
-    overlay = document.createElement("div");
-    overlay.id = "lx-test-access-gate";
+    const style = document.createElement("style");
+    style.textContent = `
+      #lx-access-v12 {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483000;
+        background: #078b50;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow-y: auto;
+        padding: 24px 18px;
+        font-family: system-ui, "Noto Sans TC",
+          sans-serif;
+      }
+      #lx-access-v12 .lx-box {
+        width: 100%;
+        max-width: 420px;
+        text-align: center;
+      }
+      #lx-access-v12 .lx-logo {
+        display: block;
+        width: min(52vw, 210px);
+        max-height: 260px;
+        object-fit: contain;
+        margin: 0 auto 16px;
+      }
+      #lx-access-v12 .lx-brand {
+        color: white;
+        font-size: 26px;
+        font-weight: 800;
+        margin: 0 0 8px;
+      }
+      #lx-access-v12 .lx-slogan {
+        color: white;
+        font-size: 15px;
+        margin: 0 0 28px;
+      }
+      #lx-access-v12 .lx-panel {
+        background: white;
+        border-radius: 22px;
+        padding: 28px 22px;
+        box-shadow: 0 12px 32px #003b202b;
+      }
+      #lx-access-v12 h2 {
+        color: #203129;
+        font-size: 22px;
+        margin: 0 0 10px;
+      }
+      #lx-access-v12 p {
+        color: #69796f;
+        font-size: 14px;
+        line-height: 1.8;
+      }
+      #lx-access-v12 button {
+        display: block;
+        width: 100%;
+        border: 0;
+        border-radius: 28px;
+        padding: 15px;
+        margin-top: 14px;
+        font-size: 16px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      #lx-access-v12 .lx-google {
+        background: #fff;
+        border: 1px solid #cbdad0;
+        color: #254934;
+      }
+      #lx-access-v12 .lx-email {
+        background: #078b50;
+        color: white;
+      }
+      #lx-access-v12 .lx-retry {
+        background: #eef5f0;
+        color: #078b50;
+      }
+      #lx-access-v12 .lx-g {
+        color: #4285f4;
+        font-weight: 900;
+        font-size: 21px;
+        margin-right: 9px;
+      }
+      #lx-access-v12 .lx-note {
+        font-size: 12px;
+        color: #819087;
+        margin-top: 18px;
+      }
+    `;
+    document.head.appendChild(style);
 
-    Object.assign(overlay.style, {
-      position: "fixed",
-      inset: "0",
-      zIndex: "2147483647",
-      background: "#f7f8f5",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: "24px",
-      fontFamily: "system-ui, sans-serif"
-    });
+    gate = document.createElement("div");
+    gate.id = "lx-access-v12";
 
-    overlay.innerHTML = `
-      <div style="
-        max-width:420px;
-        width:100%;
-        background:white;
-        padding:30px 24px;
-        border-radius:20px;
-        text-align:center;
-        box-shadow:0 8px 32px #00000012;
-      ">
-        <div style="
-          font-size:26px;
-          font-weight:900;
-          color:#078b50;
-          margin-bottom:14px;
-        ">
-          樂享家 Let's Share
+    gate.innerHTML = `
+      <div class="lx-box">
+        <img class="lx-logo" id="lx-gate-logo"
+             alt="樂享家 Let's share LOGO"
+             style="display:none">
+        <div class="lx-brand">樂享家</div>
+        <div class="lx-slogan">
+          分享，讓美好開始傳遞
         </div>
+        <div class="lx-panel">
+          <h2 id="lx-gate-heading">
+            歡迎來到樂享家
+          </h2>
+          <p id="lx-gate-description">
+            登入會員，開始分享美好生活
+          </p>
 
-        <h2 id="lx-gate-title"
-            style="font-size:21px;color:#202824">
-          正在確認測試資格
-        </h2>
+          <button type="button"
+                  class="lx-google"
+                  id="lx-gate-google">
+            <span class="lx-g">G</span>
+            使用 Google 帳號繼續
+          </button>
 
-        <p id="lx-gate-message"
-           style="
-             color:#68776d;
-             line-height:1.8;
-             font-size:14px;
-           ">
-          請稍候，正在連接 Supabase。
-        </p>
+          <button type="button"
+                  class="lx-email"
+                  id="lx-gate-email">
+            使用 Email 登入
+          </button>
 
-        <button id="lx-gate-login"
-          type="button"
-          style="
-            display:none;
-            width:100%;
-            border:0;
-            border-radius:25px;
-            background:#078b50;
-            color:white;
-            padding:14px;
-            font-weight:700;
-            cursor:pointer;
-          ">
-          前往會員登入
-        </button>
+          <button type="button"
+                  class="lx-retry"
+                  id="lx-gate-retry"
+                  style="display:none">
+            重新檢查
+          </button>
 
-        <button id="lx-gate-retry"
-          type="button"
-          style="
-            display:none;
-            margin-top:12px;
-            background:transparent;
-            color:#078b50;
-            padding:10px;
-            border:0;
-            cursor:pointer;
-          ">
-          重新檢查
-        </button>
+          <div class="lx-note">
+            樂享家開發測試版 · 僅限授權帳號
+          </div>
+        </div>
       </div>
     `;
 
-    document.body.appendChild(overlay);
+    document.body.appendChild(gate);
 
-    overlay
-      .querySelector("#lx-gate-login")
-      .addEventListener("click", () => {
-        loginInProgress = true;
+    $("lx-gate-google").addEventListener(
+      "click",
+      () => {
+        // 直接呼叫既有 Google OAuth。
+        // 不先打開臨時測試視窗。
+        if (
+          typeof window.lxGoogleLogin === "function"
+        ) {
+          window.lxGoogleLogin();
+        } else {
+          show(
+            "登入服務準備中",
+            "Google 登入尚未初始化，請稍後再試。",
+            "retry"
+          );
+        }
+      }
+    );
 
+    $("lx-gate-email").addEventListener(
+      "click",
+      () => {
+        // Email 登入暫時沿用原本已能運作的
+        // Auth 表單，避免破壞登入邏輯。
         if (
           typeof window.lxOpenRealLogin === "function"
         ) {
-          hideOverlay();
+          loginToolOpen = true;
+          hide();
           window.lxOpenRealLogin();
-        } else {
-          loginInProgress = false;
-
-          showOverlay(
-            "登入功能尚未就緒",
-            "請重新整理網頁後再試一次。",
-            false,
-            true
-          );
         }
-      });
+      }
+    );
 
-    overlay
-      .querySelector("#lx-gate-retry")
-      .addEventListener("click", () => {
-        loginInProgress = false;
-        checkAccess(true);
-      });
+    $("lx-gate-retry").addEventListener(
+      "click",
+      () => {
+        lastVerified = 0;
+        verify();
+      }
+    );
 
-    return overlay;
+    return gate;
   }
 
-  function showOverlay(
-    title,
-    message,
-    login,
-    retry
-  ) {
-    const el = createOverlay();
+  function show(title, message, mode) {
+    ensureGate();
 
-    el.style.display = "flex";
+    gate.style.display = "flex";
 
-    el.querySelector(
-      "#lx-gate-title"
-    ).textContent = title;
+    $("lx-gate-heading").textContent = title;
+    $("lx-gate-description").textContent = message;
 
-    el.querySelector(
-      "#lx-gate-message"
-    ).textContent = message;
+    $("lx-gate-google").style.display =
+      mode === "login" ? "block" : "none";
 
-    el.querySelector(
-      "#lx-gate-login"
-    ).style.display =
-      login ? "block" : "none";
+    $("lx-gate-email").style.display =
+      mode === "login" ? "block" : "none";
 
-    el.querySelector(
-      "#lx-gate-retry"
-    ).style.display =
-      retry ? "inline-block" : "none";
+    $("lx-gate-retry").style.display =
+      mode === "retry" ? "block" : "none";
   }
 
-  function hideOverlay() {
-    if (overlay) {
-      overlay.style.display = "none";
+  function hide() {
+    if (gate) gate.style.display = "none";
+  }
+
+  function updateLogo() {
+    const src = logoSource();
+    const img = $("lx-gate-logo");
+
+    if (src && img) {
+      img.src = src;
+      img.style.display = "block";
     }
   }
 
-  async function verifyWithSupabase(token) {
+  function legacyLoginVisible() {
+    const panel = $("lx-auth-panel");
+
+    return !!panel &&
+      getComputedStyle(panel).display !== "none";
+  }
+
+  async function checkRPC(token) {
     const controller = new AbortController();
 
-    const timeout = setTimeout(
+    const timer = setTimeout(
       () => controller.abort(),
       12000
     );
 
     try {
       const response = await fetch(
-        PROJECT_URL +
-          "/rest/v1/rpc/lx_can_access_test_app",
+        URL + "/rest/v1/rpc/" + RPC,
         {
           method: "POST",
           headers: {
-            apikey: PUBLIC_KEY,
+            apikey: KEY,
             Authorization: "Bearer " + token,
             "Content-Type": "application/json"
           },
@@ -239,188 +305,154 @@
 
       if (!response.ok) {
         throw new Error(
-          "Supabase 驗證失敗 HTTP " +
-          response.status
+          "驗證服務 HTTP " + response.status
         );
       }
 
-      const result = await response.json();
-
-      return result === true;
+      return (await response.json()) === true;
     } finally {
-      clearTimeout(timeout);
+      clearTimeout(timer);
     }
   }
 
-  async function checkAccess(force = false) {
-    if (checking) return;
+  async function verify() {
+    if (busy) return;
 
-    const user = getUser();
-    const session = getSession();
+    const u = user();
+    const s = session();
 
-    // 尚未登入，但登入視窗已開啟：
-    // 保持登入畫面可操作，不重複覆蓋。
-    if (!user?.id || !session?.token) {
-      allowed = false;
-      lastUserId = null;
-      lastToken = null;
+    if (!u?.id || !s?.token) {
+      approvedId = null;
+      approvedToken = null;
+      lastVerified = 0;
 
       if (
-        loginInProgress &&
-        isLoginPanelVisible()
+        loginToolOpen &&
+        legacyLoginVisible()
       ) {
-        hideOverlay();
+        hide();
         return;
       }
 
-      loginInProgress = false;
+      loginToolOpen = false;
 
-      showOverlay(
-        "測試環境需要登入",
-        "樂享家目前僅開放授權測試人員使用。請先登入會員帳號。",
-        true,
-        false
+      show(
+        "歡迎來到樂享家",
+        "請先登入會員帳號，開始分享美好生活。",
+        "login"
       );
-
       return;
     }
 
-    // 登入資料已存在，結束登入等待狀態。
-    loginInProgress = false;
+    loginToolOpen = false;
 
     if (
-      !force &&
-      allowed &&
-      lastUserId === user.id &&
-      lastToken === session.token
+      approvedId === u.id &&
+      approvedToken === s.token &&
+      Date.now() - lastVerified < 60000
     ) {
-      hideOverlay();
+      hide();
       return;
     }
 
-    checking = true;
-    allowed = false;
+    busy = true;
 
-    const currentCheck = ++checkSequence;
-
-    showOverlay(
-      "正在驗證測試資格",
-      "正在向 Supabase 確認你的帳號是否已獲得測試授權。",
-      false,
-      false
+    show(
+      "正在確認測試資格",
+      "請稍候，正在安全驗證你的會員帳號。",
+      "wait"
     );
 
     try {
-      const approved =
-        await verifyWithSupabase(
-          session.token
-        );
+      const permitted = await checkRPC(s.token);
 
-      const currentUser = getUser();
-      const currentSession = getSession();
+      const nowUser = user();
+      const nowSession = session();
 
-      // 驗證期間若切換帳號，
-      // 不使用舊帳號的驗證結果。
       if (
-        currentCheck !== checkSequence ||
-        currentUser?.id !== user.id ||
-        currentSession?.token !== session.token
+        nowUser?.id !== u.id ||
+        nowSession?.token !== s.token
       ) {
         return;
       }
 
-      if (approved) {
-        allowed = true;
-        lastUserId = user.id;
-        lastToken = session.token;
-
-        hideOverlay();
+      if (permitted) {
+        approvedId = u.id;
+        approvedToken = s.token;
+        lastVerified = Date.now();
+        hide();
       } else {
-        lastUserId = user.id;
-        lastToken = session.token;
+        approvedId = null;
+        approvedToken = null;
+        lastVerified = 0;
 
-        showOverlay(
-          "此帳號尚未取得測試權限",
-          "你的帳號未列入樂享家測試白名單，請聯繫管理員授權。",
-          false,
-          true
+        show(
+          "尚未取得測試權限",
+          "此帳號未列入樂享家測試白名單，請聯繫管理員。",
+          "retry"
         );
       }
     } catch (error) {
       console.error(
-        "[DEV-03-04] Access check failed:",
+        "[DEV-03-04] 白名單驗證失敗",
         error
       );
 
-      showOverlay(
+      approvedId = null;
+      approvedToken = null;
+      lastVerified = 0;
+
+      show(
         "暫時無法確認測試資格",
-        "請確認網路連線後重新檢查。為保護測試環境，目前不會直接放行。",
-        false,
-        true
+        "請確認網路連線後重新檢查。",
+        "retry"
       );
     } finally {
-      checking = false;
+      busy = false;
     }
   }
 
   function start() {
-    showOverlay(
-      "正在確認測試資格",
-      "正在初始化樂享家測試環境。",
-      false,
-      false
+    ensureGate();
+
+    show(
+      "正在準備樂享家",
+      "請稍候，正在確認登入狀態。",
+      "wait"
     );
 
-    const startedAt = Date.now();
+    // 原 APP 初始化及 OAuth 回跳需要時間。
+    setTimeout(() => {
+      updateLogo();
+      verify();
+    }, 1200);
 
-    const startupTimer = setInterval(() => {
-      const user = getUser();
-
-      if (
-        user?.id ||
-        Date.now() - startedAt > MAX_WAIT
-      ) {
-        clearInterval(startupTimer);
-        checkAccess();
-      }
-    }, 250);
-
-    // 持續監控登入與登出狀態。
+    // 只在登入狀態改變或驗證到期時檢查。
+    // 不再每 1.5 秒反覆覆蓋登入視窗。
     setInterval(() => {
-      if (checking) return;
+      if (busy) return;
 
-      const user = getUser();
-      const session = getSession();
+      const u = user();
+      const s = session();
 
-      // 登入視窗正在使用中：
-      // 不要讓白名單遮罩覆蓋登入工具。
       if (
-        !user?.id &&
-        loginInProgress &&
-        isLoginPanelVisible()
+        loginToolOpen &&
+        legacyLoginVisible() &&
+        !u?.id
       ) {
-        hideOverlay();
         return;
       }
 
-      // 如果登入視窗已關閉，
-      // 回到需要登入的提示畫面。
       if (
-        loginInProgress &&
-        !isLoginPanelVisible() &&
-        !user?.id
+        !u?.id ||
+        !s?.token ||
+        u.id !== approvedId ||
+        s.token !== approvedToken ||
+        Date.now() - lastVerified >= 60000
       ) {
-        loginInProgress = false;
+        verify();
       }
-
-      if (
-        !user?.id ||
-        user.id !== lastUserId ||
-        session?.token !== lastToken
-      ) {
-        checkAccess();
-      }
-    }, CHECK_INTERVAL);
+    }, 3000);
   }
 
   if (document.readyState === "loading") {
