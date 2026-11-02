@@ -1,342 +1,214 @@
 
 /*
- * 樂享家 Let's Share
- * DEV-03-04 v1.3
- *
- * Google OAuth + Supabase 測試白名單
- *
- * v1.3 修正：
- * 1. 已授權會員背景重新驗證，不閃爍。
- * 2. 權限撤銷時立即顯示阻擋畫面。
- * 3. 切換帳號、登出時重新檢查。
- * 4. 保留品牌登入頁及原有 Google OAuth。
- *
- * 注意：
- * 前端白名單不能取代資料庫 RLS。
+ * 樂享家 DEV-03-04 v1.4
+ * 穩定登入畫面、背景白名單驗證
  */
-
 (() => {
   "use strict";
 
-  const URL =
-    "https://wxvauoeykusmbxdtwgxo.supabase.co";
-
-  const KEY =
-    "sb_publishable_ZCqKEuqpTiZ46p9fx_JXvA_av4JwD3I";
-
+  const BASE = "https://wxvauoeykusmbxdtwgxo.supabase.co";
+  const KEY = "sb_publishable_ZCqKEuqpTiZ46p9fx_JXvA_av4JwD3I";
   const STORE = "lx_supabase_auth_v066g";
-  const RPC = "lx_can_access_test_app";
 
-  const CHECK_EVERY = 3000;
-  const REVERIFY_AFTER = 60000;
+  const INTERVAL = 3000;
+  const VERIFY_INTERVAL = 60000;
+  const AUTH_GRACE = 6000;
 
-  let gate = null;
-  let busy = false;
-  let approvedId = null;
+  let gate;
+  let approvedUser = null;
   let approvedToken = null;
-  let lastVerified = 0;
-  let loginToolOpen = false;
-  let currentMode = "";
-  let generation = 0;
+  let verifiedAt = 0;
+  let checking = false;
+  let authMissingSince = 0;
+  let emailOpen = false;
+  let failures = 0;
+  let requestId = 0;
 
-  const $ = id => document.getElementById(id);
+  const el = id => document.getElementById(id);
 
-  function session() {
+  function auth() {
+    let saved = null;
     try {
-      return JSON.parse(
+      saved = JSON.parse(
         sessionStorage.getItem(STORE) || "null"
       );
-    } catch {
-      return null;
-    }
+    } catch (_) {}
+
+    return {
+      user: window.__lxRealAuth?.user || null,
+      token: saved?.token || null
+    };
   }
 
-  function user() {
-    return window.__lxRealAuth?.user || null;
+  function originalLogo() {
+    return document.querySelector(".splash img")
+      ?.getAttribute("src") || "";
   }
 
-  function logoSource() {
-    const img = document.querySelector(".splash img");
-    return img?.getAttribute("src") || "";
-  }
-
-  function ensureGate() {
-    if (gate) return gate;
-
+  function createGate() {
     const style = document.createElement("style");
-
     style.textContent = `
-      #lx-access-v13 {
-        position: fixed;
-        inset: 0;
-        z-index: 2147483000;
-        background: #078b50;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow-y: auto;
-        padding: 24px 18px;
-        font-family: system-ui, "Noto Sans TC",
-          sans-serif;
+      #lx-gate-v14 {
+        position:fixed; inset:0;
+        z-index:2147483000;
+        background:#078b50;
+        display:flex;
+        justify-content:center;
+        align-items:center;
+        padding:20px;
+        overflow-y:auto;
+        font-family:system-ui,"Noto Sans TC",sans-serif;
       }
-
-      #lx-access-v13 .lx-box {
-        width: 100%;
-        max-width: 420px;
-        text-align: center;
+      #lx-gate-v14 .wrap {
+        width:100%;max-width:410px;
+        text-align:center;
       }
-
-      #lx-access-v13 .lx-logo {
-        display: block;
-        width: min(52vw, 210px);
-        max-height: 260px;
-        object-fit: contain;
-        margin: 0 auto 16px;
+      #lx-gate-v14 .brand-logo {
+        width:190px;max-width:60vw;
+        max-height:240px;object-fit:contain;
+        margin:0 auto 15px;
       }
-
-      #lx-access-v13 .lx-brand {
-        color: white;
-        font-size: 26px;
-        font-weight: 800;
-        margin-bottom: 8px;
+      #lx-gate-v14 .brand {
+        color:white;font-size:27px;
+        font-weight:800;margin:8px 0;
       }
-
-      #lx-access-v13 .lx-slogan {
-        color: white;
-        font-size: 15px;
-        margin-bottom: 28px;
+      #lx-gate-v14 .slogan {
+        color:white;margin-bottom:25px;
+        font-size:15px;
       }
-
-      #lx-access-v13 .lx-panel {
-        background: white;
-        border-radius: 22px;
-        padding: 28px 22px;
-        box-shadow: 0 12px 32px #003b202b;
+      #lx-gate-v14 .panel {
+        background:white;border-radius:24px;
+        padding:28px 23px;
+        box-shadow:0 12px 30px #003b202b;
       }
-
-      #lx-access-v13 h2 {
-        color: #203129;
-        font-size: 22px;
-        margin: 0 0 10px;
+      #lx-gate-v14 h2 {
+        color:#203129;font-size:22px;
+        margin:0 0 12px;
       }
-
-      #lx-access-v13 p {
-        color: #69796f;
-        font-size: 14px;
-        line-height: 1.8;
+      #lx-gate-v14 p {
+        color:#69796f;font-size:14px;
+        line-height:1.8;
       }
-
-      #lx-access-v13 button {
-        display: block;
-        width: 100%;
-        border: 0;
-        border-radius: 28px;
-        padding: 15px;
-        margin-top: 14px;
-        font-size: 16px;
-        font-weight: 700;
-        cursor: pointer;
+      #lx-gate-v14 button {
+        width:100%;padding:15px;
+        border-radius:28px;
+        margin-top:13px;
+        font-size:16px;font-weight:700;
+        cursor:pointer;
       }
-
-      #lx-access-v13 .lx-google {
-        background: white;
-        border: 1px solid #cbdad0;
-        color: #254934;
+      #lx-v14-google {
+        background:white;color:#254934;
+        border:1px solid #cbdad0;
       }
-
-      #lx-access-v13 .lx-email {
-        background: #078b50;
-        color: white;
+      #lx-v14-email {
+        background:#078b50;color:white;border:0;
       }
-
-      #lx-access-v13 .lx-retry {
-        background: #eef5f0;
-        color: #078b50;
+      #lx-v14-retry {
+        background:#eef5f0;color:#078b50;border:0;
       }
-
-      #lx-access-v13 .lx-g {
-        color: #4285f4;
-        font-size: 21px;
-        font-weight: 900;
-        margin-right: 9px;
-      }
-
-      #lx-access-v13 .lx-note {
-        font-size: 12px;
-        color: #819087;
-        margin-top: 18px;
+      #lx-gate-v14 .note {
+        font-size:12px;color:#819087;
+        margin-top:18px;
       }
     `;
-
     document.head.appendChild(style);
 
     gate = document.createElement("div");
-    gate.id = "lx-access-v13";
-
+    gate.id = "lx-gate-v14";
     gate.innerHTML = `
-      <div class="lx-box">
-        <img
-          class="lx-logo"
-          id="lx-gate-logo"
-          alt="樂享家 Let's share LOGO"
-          style="display:none"
-        >
-
-        <div class="lx-brand">樂享家</div>
-
-        <div class="lx-slogan">
-          分享，讓美好開始傳遞
-        </div>
-
-        <div class="lx-panel">
-          <h2 id="lx-gate-heading">
-            歡迎來到樂享家
-          </h2>
-
-          <p id="lx-gate-description">
+      <div class="wrap">
+        <img id="lx-v14-logo"
+             class="brand-logo"
+             alt="樂享家正式 LOGO"
+             style="display:none">
+        <div class="brand">樂享家</div>
+        <div class="slogan">分享，讓美好開始傳遞</div>
+        <div class="panel">
+          <h2 id="lx-v14-title">歡迎來到樂享家</h2>
+          <p id="lx-v14-msg">
             登入會員，開始分享美好生活
           </p>
-
-          <button
-            type="button"
-            class="lx-google"
-            id="lx-gate-google"
-          >
-            <span class="lx-g">G</span>
+          <button id="lx-v14-google" type="button">
             使用 Google 帳號繼續
           </button>
-
-          <button
-            type="button"
-            class="lx-email"
-            id="lx-gate-email"
-          >
+          <button id="lx-v14-email" type="button">
             使用 Email 登入
           </button>
-
-          <button
-            type="button"
-            class="lx-retry"
-            id="lx-gate-retry"
-            style="display:none"
-          >
+          <button id="lx-v14-retry" type="button"
+                  style="display:none">
             重新檢查
           </button>
-
-          <div class="lx-note">
+          <div class="note">
             樂享家開發測試版 · 僅限授權帳號
           </div>
         </div>
       </div>
     `;
-
     document.body.appendChild(gate);
 
-    $("lx-gate-google").addEventListener(
-      "click",
-      () => {
-        if (
-          typeof window.lxGoogleLogin === "function"
-        ) {
-          window.lxGoogleLogin();
-        } else {
-          show(
-            "登入服務準備中",
-            "請稍後重新整理頁面再試。",
-            "retry"
-          );
-        }
+    el("lx-v14-google").onclick = () => {
+      if (typeof window.lxGoogleLogin === "function") {
+        window.lxGoogleLogin();
+      } else {
+        display("登入服務尚未準備完成",
+                "請重新整理頁面。", "retry");
       }
-    );
+    };
 
-    $("lx-gate-email").addEventListener(
-      "click",
-      () => {
-        if (
-          typeof window.lxOpenRealLogin === "function"
-        ) {
-          loginToolOpen = true;
-          hide();
-          window.lxOpenRealLogin();
-        }
+    el("lx-v14-email").onclick = () => {
+      if (typeof window.lxOpenRealLogin === "function") {
+        emailOpen = true;
+        hide();
+        window.lxOpenRealLogin();
       }
-    );
+    };
 
-    $("lx-gate-retry").addEventListener(
-      "click",
-      () => {
-        lastVerified = 0;
-        verify(true);
-      }
-    );
-
-    return gate;
+    el("lx-v14-retry").onclick = () => {
+      failures = 0;
+      verifiedAt = 0;
+      check(true);
+    };
   }
 
-  function show(title, message, mode) {
-    ensureGate();
-
-    // 相同畫面不重複改寫，避免閃爍。
-    if (
-      currentMode === mode &&
-      gate.style.display !== "none" &&
-      $("lx-gate-heading").textContent === title &&
-      $("lx-gate-description").textContent === message
-    ) {
-      return;
-    }
-
-    currentMode = mode;
+  function display(title, message, mode) {
     gate.style.display = "flex";
-
-    $("lx-gate-heading").textContent = title;
-    $("lx-gate-description").textContent = message;
-
-    $("lx-gate-google").style.display =
+    el("lx-v14-title").textContent = title;
+    el("lx-v14-msg").textContent = message;
+    el("lx-v14-google").style.display =
       mode === "login" ? "block" : "none";
-
-    $("lx-gate-email").style.display =
+    el("lx-v14-email").style.display =
       mode === "login" ? "block" : "none";
-
-    $("lx-gate-retry").style.display =
+    el("lx-v14-retry").style.display =
       mode === "retry" ? "block" : "none";
   }
 
   function hide() {
-    if (gate) {
-      gate.style.display = "none";
-    }
-    currentMode = "";
+    gate.style.display = "none";
   }
 
-  function updateLogo() {
-    const src = logoSource();
-    const img = $("lx-gate-logo");
-
-    if (src && img) {
-      img.src = src;
-      img.style.display = "block";
-    }
-  }
-
-  function legacyLoginVisible() {
-    const panel = $("lx-auth-panel");
-
+  function emailPanelVisible() {
+    const panel = el("lx-auth-panel");
     return !!panel &&
       getComputedStyle(panel).display !== "none";
   }
 
-  async function checkRPC(token) {
-    const controller = new AbortController();
+  function clearApproval() {
+    approvedUser = null;
+    approvedToken = null;
+    verifiedAt = 0;
+    failures = 0;
+    requestId++;
+  }
 
-    const timer = setTimeout(
-      () => controller.abort(),
-      12000
+  async function allowed(token) {
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(), 12000
     );
 
     try {
       const response = await fetch(
-        URL + "/rest/v1/rpc/" + RPC,
+        BASE + "/rest/v1/rpc/lx_can_access_test_app",
         {
           method: "POST",
           headers: {
@@ -351,195 +223,168 @@
       );
 
       if (!response.ok) {
-        throw new Error(
-          "驗證服務 HTTP " + response.status
-        );
+        throw new Error("HTTP " + response.status);
       }
 
       return (await response.json()) === true;
     } finally {
-      clearTimeout(timer);
+      clearTimeout(timeout);
     }
   }
 
-  async function verify(force = false) {
-    if (busy) return;
+  async function check(force = false) {
+    if (checking) return;
 
-    const u = user();
-    const s = session();
+    const state = auth();
+    const id = state.user?.id;
+    const token = state.token;
 
-    if (!u?.id || !s?.token) {
-      generation++;
-
-      approvedId = null;
-      approvedToken = null;
-      lastVerified = 0;
+    if (!id || !token) {
+      // 避免 Auth 初始化或更新時瞬間變成空值。
+      if (!authMissingSince) {
+        authMissingSince = Date.now();
+      }
 
       if (
-        loginToolOpen &&
-        legacyLoginVisible()
+        approvedUser &&
+        Date.now() - authMissingSince < AUTH_GRACE
       ) {
+        return;
+      }
+
+      clearApproval();
+
+      if (emailOpen && emailPanelVisible()) {
         hide();
         return;
       }
 
-      loginToolOpen = false;
+      emailOpen = false;
 
-      show(
+      display(
         "歡迎來到樂享家",
-        "請先登入會員帳號，開始分享美好生活。",
+        "請登入會員帳號，開始分享美好生活。",
         "login"
       );
-
       return;
     }
 
-    loginToolOpen = false;
+    authMissingSince = 0;
+    emailOpen = false;
 
-    const sameAccount =
-      approvedId === u.id;
+    const sameUser = approvedUser === id;
+    const fresh =
+      Date.now() - verifiedAt < VERIFY_INTERVAL;
 
-    const sameToken =
-      approvedToken === s.token;
-
-    const stillFresh =
-      Date.now() - lastVerified < REVERIFY_AFTER;
-
-    if (
-      !force &&
-      sameAccount &&
-      sameToken &&
-      stillFresh
-    ) {
+    if (!force && sameUser && fresh) {
+      // Token 更新不需要重新顯示審核畫面。
+      approvedToken = token;
       hide();
       return;
     }
 
-    /*
-     * 已授權帳號：
-     * 背景重新驗證，不顯示審核遮罩。
-     *
-     * 新帳號或尚未授權：
-     * 必須先完成檢查才能使用 APP。
-     */
-    const backgroundCheck =
-      sameAccount && lastVerified > 0;
+    const background = sameUser && verifiedAt > 0;
 
-    busy = true;
-    const thisGeneration = ++generation;
+    checking = true;
+    const thisRequest = ++requestId;
 
-    if (!backgroundCheck) {
-      show(
+    if (!background) {
+      display(
         "正在確認測試資格",
-        "請稍候，正在安全驗證你的會員帳號。",
+        "正在安全驗證會員帳號，請稍候。",
         "wait"
       );
     }
 
     try {
-      const permitted =
-        await checkRPC(s.token);
+      const permitted = await allowed(token);
+      const latest = auth();
 
-      const nowUser = user();
-      const nowSession = session();
-
+      // 驗證期間換帳號或 Token 更新，
+      // 舊請求結果不套用。
       if (
-        thisGeneration !== generation ||
-        nowUser?.id !== u.id ||
-        nowSession?.token !== s.token
+        thisRequest !== requestId ||
+        latest.user?.id !== id ||
+        latest.token !== token
       ) {
         return;
       }
 
       if (permitted) {
-        approvedId = u.id;
-        approvedToken = s.token;
-        lastVerified = Date.now();
-
-        // 背景驗證成功不重新顯示畫面。
+        approvedUser = id;
+        approvedToken = token;
+        verifiedAt = Date.now();
+        failures = 0;
         hide();
       } else {
-        approvedId = null;
-        approvedToken = null;
-        lastVerified = 0;
-
-        show(
+        clearApproval();
+        display(
           "尚未取得測試權限",
-          "此帳號未列入樂享家測試白名單，請聯繫管理員。",
+          "此帳號不在樂享家測試白名單內。",
           "retry"
         );
       }
     } catch (error) {
-      console.error(
-        "[DEV-03-04] 白名單驗證失敗",
-        error
-      );
+      console.error("[樂享家白名單]", error);
+      failures++;
 
-      approvedId = null;
-      approvedToken = null;
-      lastVerified = 0;
+      // 已通過的會員遇到一次短暫網路錯誤，
+      // 不立即跳頁；下次再驗證。
+      if (background && failures < 2) {
+        verifiedAt = Date.now() - VERIFY_INTERVAL + 10000;
+        return;
+      }
 
-      show(
+      clearApproval();
+      display(
         "暫時無法確認測試資格",
-        "請確認網路連線後重新檢查。",
+        "請檢查網路連線，再重新驗證。",
         "retry"
       );
     } finally {
-      busy = false;
+      checking = false;
     }
   }
 
   function start() {
-    ensureGate();
+    createGate();
 
-    show(
+    display(
       "正在準備樂享家",
-      "請稍候，正在確認登入狀態。",
+      "正在確認登入狀態，請稍候。",
       "wait"
     );
 
     setTimeout(() => {
-      updateLogo();
-      verify();
+      const logo = originalLogo();
+      if (logo) {
+        el("lx-v14-logo").src = logo;
+        el("lx-v14-logo").style.display = "block";
+      }
+      check();
     }, 1200);
 
     setInterval(() => {
-      if (busy) return;
+      if (checking) return;
 
-      const u = user();
-      const s = session();
-
-      if (
-        loginToolOpen &&
-        legacyLoginVisible() &&
-        !u?.id
-      ) {
-        return;
-      }
-
-      if (!u?.id || !s?.token) {
-        verify();
-        return;
-      }
-
-      const accountChanged =
-        u.id !== approvedId;
-
-      const tokenChanged =
-        s.token !== approvedToken;
-
-      const expired =
-        Date.now() - lastVerified >=
-        REVERIFY_AFTER;
+      const state = auth();
+      const id = state.user?.id;
 
       if (
-        accountChanged ||
-        tokenChanged ||
-        expired
+        emailOpen &&
+        emailPanelVisible() &&
+        !id
+      ) return;
+
+      if (
+        !id ||
+        !state.token ||
+        id !== approvedUser ||
+        Date.now() - verifiedAt >= VERIFY_INTERVAL
       ) {
-        verify();
+        check();
       }
-    }, CHECK_EVERY);
+    }, INTERVAL);
   }
 
   if (document.readyState === "loading") {
