@@ -1,1 +1,401 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>樂享家｜分享袋放置確認</title><style>:root{font-family:system-ui,'Noto Sans TC',sans-serif;color:#173b2a;background:#078b50}*{box-sizing:border-box}body{margin:0}.wrap{max-width:520px;margin:auto;padding:24px 16px 48px}.head{text-align:center;color:white;margin-bottom:24px}.head h1{margin:0;font-size:30px}.head p{margin:8px}.card{background:white;border-radius:22px;padding:24px 20px}h2{margin:0 0 10px}h3{font-size:17px;margin-top:24px}.muted{color:#65796d;font-size:14px;line-height:1.7}.option{display:flex;gap:10px;align-items:center;border:1px solid #dce8df;border-radius:14px;padding:13px;margin:9px 0}.option:has(input:checked){background:#e8f7ee;border-color:#078b50}input[type=radio],input[type=checkbox]{accent-color:#078b50}select,input[type=file]{width:100%;margin:12px 0;padding:12px;font:inherit}.address{padding:15px;background:#f1f8f3;border-radius:12px;white-space:pre-wrap;line-height:1.6}button,a.action{display:block;width:100%;border:0;border-radius:14px;padding:14px;margin-top:12px;background:#078b50;color:white;font-size:16px;font-weight:700;text-align:center;text-decoration:none}a.action{background:#e9f4ed;color:#11653b}.hidden{display:none}#preview{max-width:100%;max-height:280px;border-radius:12px;display:none;margin:12px auto}#status{padding:12px;background:#f0f5f1;border-radius:10px;white-space:pre-wrap;font-size:14px;line-height:1.7}#pointInfo{white-space:pre-wrap}.footer{color:#e1f5e8;text-align:center;font-size:12px;margin-top:20px}</style></head><body><main class="wrap"><header class="head"><h1>樂享家</h1><p>分享，讓美好開始傳遞</p></header><section class="card"><h2>分享袋放置地點</h2><p class="muted">預設使用會員資料中的住家地址，不必每次重新填寫。</p><p class="muted" id="identity">正在確認登入…</p><h3>選擇交付方式</h3><label class="option"><input type="radio" name="kind" value="home" checked>🏠 自家門口（預設）</label><label class="option"><input type="radio" name="kind" value="collection_point">📍 樂享家核准集貨點</label><div id="home"><div class="address" id="homeAddress">正在讀取會員住家地址…</div><a class="action" href="./member-address.html">前往會員資料修改住家地址</a></div><div id="point" class="hidden"><label for="pointSelect">選擇核准集貨點</label><select id="pointSelect"><option value="">讀取中…</option></select><p class="muted" id="pointInfo">僅顯示總部已核准並啟用的地點。</p></div><h3>分享袋現場照片</h3><p class="muted">將封好的分享袋放妥後，拍攝袋件及周圍環境。照片在本測試版僅供本機預覽，尚未上傳。</p><input id="photo" type="file" accept="image/jpeg,image/png,image/webp" capture="environment"><img id="preview" alt="分享袋現場照片預覽"><p class="muted" id="photoInfo">尚未選擇照片</p><label class="option"><input type="checkbox" id="placed">我已將封好的分享袋放在所選位置，照片為實際現場。</label><button id="test" type="button">檢查申報資料（不會正式提交）</button><div id="status" role="status">C09-05 測試版：不會派遣騎手，也不會開始計算 48 小時。</div><a class="action" href="./">返回樂享家 APP</a></section><p class="footer">樂享家 C09-05｜測試版</p></main><script>(()=>{'use strict';const BASE='https://wxvauoeykusmbxdtwgxo.supabase.co',KEY='sb_publishable_ZCqKEuqpTiZ46p9fx_JXvA_av4JwD3I',STORE='lx_supabase_auth_v066g';const $=id=>document.getElementById(id);let token=null,homeAddress='',points=[];function session(){try{return JSON.parse(sessionStorage.getItem(STORE)||'null')}catch{return null}}async function api(path,body){if(!token)throw Error('尚未登入，請先回 APP 登入。');const rpc=path.startsWith('rpc/');const res=await fetch(BASE+'/rest/v1/'+path,{method:rpc?'POST':'GET',headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json'},...(rpc?{body:JSON.stringify(body||{})}:{})});if(!res.ok){let msg='伺服器錯誤 '+res.status;try{const j=await res.json();msg=j.message||msg}catch{}throw Error(msg)}return res.json()}function kind(){return document.querySelector('input[name=kind]:checked').value}function toggle(){const isHome=kind()==='home';$('home').classList.toggle('hidden',!isHome);$('point').classList.toggle('hidden',isHome)}document.querySelectorAll('input[name=kind]').forEach(e=>e.addEventListener('change',toggle));$('pointSelect').onchange=()=>{const p=points.find(x=>x.id===$('pointSelect').value);$('pointInfo').textContent=p?`${p.address_text}${p.placement_note?'\n放置位置：'+p.placement_note:''}`:'請選擇已核准集貨點。'};$('photo').onchange=()=>{const f=$('photo').files?.[0],img=$('preview');if(img.dataset.url)URL.revokeObjectURL(img.dataset.url);img.style.display='none';img.removeAttribute('src');img.dataset.url='';if(!f){$('photoInfo').textContent='尚未選擇照片';return}if(!['image/jpeg','image/png','image/webp'].includes(f.type)||f.size>10*1024*1024){$('photo').value='';$('photoInfo').textContent='僅接受 JPG、PNG、WEBP，且不可超過 10 MB';return}img.dataset.url=URL.createObjectURL(f);img.src=img.dataset.url;img.style.display='block';$('photoInfo').textContent='已選擇現場照片（僅本機預覽）'};$('test').onclick=()=>{if(!token){$('status').textContent='請先登入';return}if(kind()==='home'&&!homeAddress){$('status').textContent='請先到會員資料填寫住家地址。';return}if(kind()==='collection_point'&&!$('pointSelect').value){$('status').textContent='請選擇核准集貨點。';return}if(!$('photo').files?.length){$('status').textContent='請先拍攝現場照片。';return}if(!$('placed').checked){$('status').textContent='請確認分享袋已放置。';return}$('status').textContent='✓ 地址來源確認\n✓ 照片已選擇\n✓ 放置已確認\n\n僅完成前端測試；尚未上傳照片、正式提交或派工。'};async function init(){token=session()?.token||null;if(!token){$('identity').textContent='尚未偵測到登入狀態，請先返回 APP 登入。';$('homeAddress').textContent='登入後自動帶入會員住家地址';return}$('identity').textContent='已取得會員登入資訊';try{const rows=await api('rpc/lx_get_my_home_address');homeAddress=rows?.[0]?.address_text||'';const note=rows?.[0]?.placement_note;$('homeAddress').textContent=homeAddress+(note?'\n放置說明：'+note:'')||'尚未設定住家地址，請先至會員資料填寫。'}catch(e){$('homeAddress').textContent='讀取地址失敗：'+e.message}try{points=await api('lx_approved_collection_points?select=id,name,address_text,placement_note&enabled=eq.true&order=name.asc')||[];$('pointSelect').innerHTML='<option value="">請選擇集貨點</option>';for(const p of points){const opt=document.createElement('option');opt.value=p.id;opt.textContent=p.name;$('pointSelect').appendChild(opt)}if(!points.length)$('pointInfo').textContent='目前尚無已核准且開放的集貨點。'}catch(e){$('pointInfo').textContent='讀取集貨點失敗：'+e.message}}init()})();</script></body></html>
+
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>樂享家｜分享袋放置確認</title>
+<style>
+:root{font-family:system-ui,"Noto Sans TC",sans-serif;color:#173b2a;background:#078b50}
+*{box-sizing:border-box}
+body{margin:0}
+.wrap{max-width:520px;margin:auto;padding:24px 16px 48px}
+.head{text-align:center;color:white;margin:8px 0 25px}
+.head h1{margin:0;font-size:30px}
+.head p{margin:8px 0;font-size:14px}
+.card{background:#fff;border-radius:22px;padding:23px 20px;box-shadow:0 8px 30px #00381b24}
+h2{margin:0 0 10px;font-size:22px}
+h3{font-size:17px;margin:25px 0 10px}
+.muted{color:#64776c;font-size:14px;line-height:1.7}
+.option{display:flex;gap:10px;align-items:center;border:1px solid #dce8df;border-radius:14px;padding:13px;margin:9px 0;cursor:pointer}
+.option:has(input:checked){background:#e8f7ee;border-color:#078b50}
+input[type=radio],input[type=checkbox]{accent-color:#078b50}
+select{width:100%;padding:13px;border:1px solid #bfcfc5;border-radius:12px;font:inherit;margin:6px 0 12px;background:white;color:#173b2a}
+button,.link{display:block;text-align:center;width:100%;border:0;border-radius:14px;padding:14px;margin-top:12px;background:#078b50;color:white;font-size:16px;font-weight:700;text-decoration:none;cursor:pointer}
+button:disabled{opacity:.45;cursor:wait}
+button.secondary,.link.secondary{background:#eef5f0;color:#12633c}
+.hidden{display:none}
+#preview{max-width:100%;max-height:260px;border-radius:12px;display:none;margin:12px auto}
+#status{padding:12px;border-radius:10px;background:#f0f5f1;color:#315843;margin-top:14px;white-space:pre-wrap;font-size:14px;line-height:1.6;overflow-wrap:anywhere}
+.warn{background:#fff6df!important;color:#755619!important}
+.footer{color:#dff5e8;text-align:center;font-size:12px;margin-top:20px}
+input[type=file]{max-width:100%;margin:12px 0}
+.address{background:#f0f7f2;border-radius:12px;padding:14px;margin:10px 0;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<main class="wrap">
+<header class="head">
+<h1>樂享家</h1>
+<p>分享，讓美好開始傳遞</p>
+</header>
+
+<section class="card">
+<h2>分享袋放置確認</h2>
+<p class="muted">預設於會員登記的住家門口交付。若需使用集貨點，請自行切換選擇。</p>
+<div id="identity" class="muted">正在確認登入狀態…</div>
+
+<h3>選擇交付方式</h3>
+<label class="option">
+<input type="radio" name="kind" value="home" checked>
+🏠 自家門口（預設）
+</label>
+<label class="option">
+<input type="radio" name="kind" value="collection_point">
+📍 樂享家核准集貨點
+</label>
+
+<div id="home">
+<div id="homeAddress" class="address">正在讀取會員住家地址…</div>
+<a class="link secondary" href="./member-address.html">前往會員資料修改住家地址</a>
+</div>
+
+<div id="point" class="hidden">
+<label for="pointSelect">選擇已核准集貨點</label>
+<select id="pointSelect">
+<option value="">讀取中…</option>
+</select>
+<p class="muted" id="pointInfo">僅顯示總部核准且已啟用的地點。</p>
+</div>
+
+<h3>拍攝分享袋現場照片</h3>
+<p class="muted">請先將封好的分享袋放在指定位置，再拍攝袋件與周圍環境，方便騎手辨識。避免拍到人臉或其他不必要的個人資料。</p>
+
+<input id="photo" type="file" accept="image/jpeg,image/png,image/webp" capture="environment">
+<img id="preview" alt="分享袋放置照片預覽">
+<p class="muted" id="photoInfo">尚未選擇照片。</p>
+
+<label class="option">
+<input type="checkbox" id="placed">
+我已將封好的分享袋放在所選位置，照片為實際現場。
+</label>
+
+<button id="test" type="button">檢查申報資料（不會正式提交）</button>
+<button id="upload" type="button" disabled>上傳現場照片至私有空間（測試）</button>
+
+<div id="status" role="status">
+此為 C09-06 測試頁。照片可上傳至私人儲存空間，但尚未建立正式投袋申報，也不會派遣騎手。
+</div>
+
+<a class="link secondary" href="./">返回樂享家 APP</a>
+</section>
+<p class="footer">樂享家 C09-06 · 測試版 · 不建立正式取件任務</p>
+</main>
+
+<script>
+(()=>{
+"use strict";
+
+const BASE="https://wxvauoeykusmbxdtwgxo.supabase.co";
+const KEY="sb_publishable_ZCqKEuqpTiZ46p9fx_JXvA_av4JwD3I";
+const STORE="lx_supabase_auth_v066g";
+const BUCKET="share-placement-photos";
+
+const $=id=>document.getElementById(id);
+let user=null;
+let token=null;
+let points=[];
+let homeAddress="";
+let homeNote="";
+let checked=false;
+let uploaded=false;
+let uploadedPath="";
+
+function status(msg,warn=false){
+  $("status").textContent=msg;
+  $("status").className=warn?"warn":"";
+}
+
+function session(){
+  try{
+    return JSON.parse(sessionStorage.getItem(STORE)||"null");
+  }catch{
+    return null;
+  }
+}
+
+function jwtUserId(jwt){
+  try{
+    const part=jwt.split(".")[1].replace(/-/g,"+").replace(/_/g,"/");
+    return JSON.parse(atob(part)).sub||null;
+  }catch{
+    return null;
+  }
+}
+
+async function api(path,options={}){
+  if(!token)throw Error("請先從 APP 登入後再開啟此頁");
+
+  const res=await fetch(BASE+"/rest/v1/"+path,{
+    ...options,
+    headers:{
+      apikey:KEY,
+      Authorization:"Bearer "+token,
+      "Content-Type":"application/json",
+      ...(options.headers||{})
+    }
+  });
+
+  if(!res.ok){
+    let detail="";
+    try{
+      const j=await res.json();
+      detail=j.message||j.error||"";
+    }catch{}
+    throw Error(detail||"伺服器回應 "+res.status);
+  }
+
+  if(res.status===204)return null;
+  const t=await res.text();
+  return t?JSON.parse(t):null;
+}
+
+function selectedKind(){
+  return document.querySelector("input[name=kind]:checked").value;
+}
+
+function toggle(){
+  const home=selectedKind()==="home";
+  $("home").classList.toggle("hidden",!home);
+  $("point").classList.toggle("hidden",home);
+  checked=false;
+  $("upload").disabled=true;
+}
+
+document.querySelectorAll("input[name=kind]").forEach(
+  e=>e.addEventListener("change",toggle)
+);
+
+$("pointSelect").onchange=()=>{
+  const p=points.find(x=>x.id===$("pointSelect").value);
+  $("pointInfo").textContent=p
+    ?p.address_text+(p.placement_note?"\n指定位置："+p.placement_note:"")
+    :"僅顯示總部核准且已啟用的地點。";
+  checked=false;
+  $("upload").disabled=true;
+};
+
+$("photo").onchange=()=>{
+  const file=$("photo").files?.[0];
+  const img=$("preview");
+
+  if(img.dataset.url)URL.revokeObjectURL(img.dataset.url);
+
+  img.style.display="none";
+  img.removeAttribute("src");
+  img.dataset.url="";
+  checked=false;
+  uploaded=false;
+  uploadedPath="";
+  $("upload").disabled=true;
+
+  if(!file){
+    $("photoInfo").textContent="尚未選擇照片";
+    return;
+  }
+
+  if(!["image/jpeg","image/png","image/webp"].includes(file.type)
+     ||file.size>10*1024*1024){
+    $("photo").value="";
+    $("photoInfo").textContent="僅接受 JPG、PNG、WEBP，檔案不得超過 10 MB";
+    return;
+  }
+
+  img.dataset.url=URL.createObjectURL(file);
+  img.src=img.dataset.url;
+  img.style.display="block";
+  $("photoInfo").textContent=
+    "已選取 "+file.name+"（尚未上傳）";
+};
+
+$("placed").onchange=()=>{
+  checked=false;
+  $("upload").disabled=true;
+};
+
+function validate(){
+  if(!user)throw Error("尚未登入，請先返回 APP 登入。");
+
+  if(selectedKind()==="home"&&!homeAddress.trim()){
+    throw Error("會員資料尚未設定住家地址，請先前往會員資料填寫。");
+  }
+
+  if(selectedKind()==="collection_point"&&!$("pointSelect").value){
+    throw Error("請先選擇總部核准的集貨點。");
+  }
+
+  if(!$("photo").files?.length){
+    throw Error("請先拍攝分享袋放置現場照片。");
+  }
+
+  if(!$("placed").checked){
+    throw Error("請勾選確認分享袋已放置完成。");
+  }
+
+  return true;
+}
+
+$("test").onclick=()=>{
+  try{
+    validate();
+    checked=true;
+    $("upload").disabled=uploaded;
+
+    status(
+      "✓ 地址來源確認\n"+
+      "✓ 照片已選擇\n"+
+      "✓ 放置已確認\n\n"+
+      (uploaded
+        ?"照片已上傳至私人儲存空間。"
+        :"可進行下一步：上傳現場照片至私人儲存空間。")+
+      "\n\n目前尚未正式申報、派工或啟動 48 小時計時。"
+    );
+  }catch(e){
+    checked=false;
+    $("upload").disabled=true;
+    status(e.message,true);
+  }
+};
+
+$("upload").onclick=async()=>{
+  if(!checked)return;
+
+  try{
+    validate();
+
+    const file=$("photo").files[0];
+    const ext={
+      "image/jpeg":"jpg",
+      "image/png":"png",
+      "image/webp":"webp"
+    }[file.type];
+
+    if(!ext)throw Error("不支援的照片格式");
+
+    const uuid=crypto.randomUUID();
+    const path=user+"/"+uuid+"."+ext;
+
+    $("upload").disabled=true;
+    status("正在上傳照片，請稍候…");
+
+    const res=await fetch(
+      BASE+"/storage/v1/object/"+BUCKET+"/"+path,
+      {
+        method:"POST",
+        headers:{
+          apikey:KEY,
+          Authorization:"Bearer "+token,
+          "Content-Type":file.type,
+          "x-upsert":"false"
+        },
+        body:file
+      }
+    );
+
+    if(!res.ok){
+      let detail="";
+      try{
+        const j=await res.json();
+        detail=j.message||j.error||"";
+      }catch{}
+      throw Error(detail||"照片上傳失敗，狀態碼 "+res.status);
+    }
+
+    uploaded=true;
+    uploadedPath=path;
+
+    status(
+      "✓ 照片已成功上傳至 Supabase 私有儲存空間。\n\n"+
+      "儲存路徑："+uploadedPath+"\n\n"+
+      "注意：照片尚未綁定分享袋，也沒有正式申報或派工。\n"+
+      "48 小時取件期限尚未開始。"
+    );
+
+  }catch(e){
+    status("上傳失敗："+e.message,true);
+    $("upload").disabled=false;
+  }
+};
+
+async function init(){
+  const s=session();
+  token=s?.token||null;
+  user=token?jwtUserId(token):null;
+
+  if(!user){
+    $("identity").textContent=
+      "尚未取得登入狀態。請先在樂享家 APP 登入，並由同一瀏覽器分頁開啟此頁。";
+    $("homeAddress").textContent="請先登入";
+    $("pointSelect").innerHTML='<option value="">請先登入</option>';
+    return;
+  }
+
+  $("identity").textContent="✓ 已偵測到會員登入狀態";
+
+  try{
+    const data=await fetch(BASE+"/rest/v1/rpc/lx_get_my_home_address",{
+      method:"POST",
+      headers:{
+        apikey:KEY,
+        Authorization:"Bearer "+token,
+        "Content-Type":"application/json"
+      },
+      body:"{}"
+    });
+
+    if(!data.ok)throw Error("無法讀取會員住家地址");
+
+    const a=await data.json();
+    const record=Array.isArray(a)?a[0]:a;
+
+    homeAddress=record?.address_text||"";
+    homeNote=record?.placement_note||"";
+
+    $("homeAddress").textContent=homeAddress
+      ?homeAddress+(homeNote?"\n放置說明："+homeNote:"")
+      :"尚未設定住家地址，請前往會員資料填寫。";
+
+  }catch(e){
+    status("讀取會員地址失敗："+e.message,true);
+  }
+
+  try{
+    points=await api(
+      "lx_approved_collection_points?select=id,name,address_text,placement_note&enabled=eq.true&order=name.asc"
+    )||[];
+
+    $("pointSelect").innerHTML='<option value="">請選擇集貨點</option>';
+
+    for(const p of points){
+      const opt=document.createElement("option");
+      opt.value=p.id;
+      opt.textContent=p.name;
+      $("pointSelect").appendChild(opt);
+    }
+
+    if(!points.length){
+      $("pointInfo").textContent=
+        "目前沒有總部核准並開放使用的集貨點，請選擇住家門口。";
+    }
+
+  }catch(e){
+    $("pointSelect").innerHTML='<option value="">無法載入集貨點</option>';
+    status("讀取集貨點失敗："+e.message,true);
+  }
+}
+
+init();
+})();
+</script>
+</body>
+</html>
