@@ -1,0 +1,80 @@
+
+name: UI-001 Member Center Cleanup (Preview Only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Consolidate preview member center
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('mod-preview/js/legacy-01.js')
+          s = p.read_text(encoding='utf-8')
+
+          start_marker = '<h2 class="title">我的 <span style="font-size:12px;color:#168455;font-weight:600">V0.6.6q｜會員分級註冊測試版</span></h2>'
+          end_marker = '<div class="card row">'
+
+          if start_marker not in s:
+              raise SystemExit('找不到原始會員中心標記，已停止修改')
+
+          start = s.index(start_marker)
+          end = s.index(end_marker, start)
+
+          new = """<h2 class="title">我的會員中心</h2>
+          ${window.lxMemberBanner?window.lxMemberBanner():''}
+          <div class="card" style="padding:18px;margin:12px 0;border:1px solid #dce9e1;border-radius:20px">
+            <b style="font-size:18px">帳戶與會員服務</b>
+            <p class="muted" style="font-size:13px">管理基本資料、手機安全與分享紀錄</p>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px">
+              <button type="button" onclick="document.getElementById('lx-ui-profile')?.scrollIntoView({behavior:'smooth',block:'start'})" style="padding:16px 8px;border:1px solid #dce9e1;border-radius:16px;background:#f8fcfa;color:#245a42">
+                <span style="display:block;font-size:27px">👤</span>基本資料
+              </button>
+              <button type="button" onclick="document.getElementById('lx-ui-phone')?.scrollIntoView({behavior:'smooth',block:'start'})" style="padding:16px 8px;border:1px solid #dce9e1;border-radius:16px;background:#f8fcfa;color:#245a42">
+                <span style="display:block;font-size:27px">📱</span>手機驗證
+              </button>
+              <button type="button" onclick="document.getElementById('lx-ui-consent')?.scrollIntoView({behavior:'smooth',block:'start'})" style="padding:16px 8px;border:1px solid #dce9e1;border-radius:16px;background:#f8fcfa;color:#245a42">
+                <span style="display:block;font-size:27px">📄</span>會員文件
+              </button>
+              <button type="button" onclick="document.getElementById('lx-ui-share')?.scrollIntoView({behavior:'smooth',block:'start'})" style="padding:16px 8px;border:1px solid #dce9e1;border-radius:16px;background:#f8fcfa;color:#245a42">
+                <span style="display:block;font-size:27px">📦</span>分享紀錄
+              </button>
+            </div>
+          </div>
+          <section id="lx-ui-profile" style="scroll-margin-top:130px">${window.lxProfileEditor?window.lxProfileEditor():''}</section>
+          <section id="lx-ui-phone" style="scroll-margin-top:130px">${window.lxOtpCard?window.lxOtpCard():''}</section>
+          <section id="lx-ui-consent" style="scroll-margin-top:130px">${window.lxConsentCard?window.lxConsentCard():''}</section>
+          <section id="lx-ui-share" style="scroll-margin-top:130px">${window.lxMyShareBagsCard?window.lxMyShareBagsCard():''}</section>
+          <details class="card" style="padding:14px;margin:14px 0">
+            <summary style="cursor:pointer;font-weight:600;color:#526e5e">開發測試與註冊狀態</summary>
+            ${window.lxOnboardCard?window.lxOnboardCard():''}
+            ${window.lxRegistrationCard?window.lxRegistrationCard():''}
+            ${window.lxOperatorCard?window.lxOperatorCard():''}
+          </details>"""
+
+          s = s[:start] + new + s[end:]
+          p.write_text(s, encoding='utf-8')
+          print('UI-001 preview member center updated')
+          PY
+
+      - name: Commit preview only
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mod-preview/js/legacy-01.js
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m "UI-001 consolidate preview member center"
+            git push
+          fi
