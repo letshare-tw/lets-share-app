@@ -1,0 +1,103 @@
+
+name: UI-001 Member Navigation (Preview Only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Convert member cards into functional panels
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('mod-preview/js/legacy-01.js')
+          s = p.read_text(encoding='utf-8')
+
+          if 'window.lxOpenMemberPanel=function' in s:
+              print('UI-001 navigation already installed')
+              raise SystemExit(0)
+
+          names = ['profile','phone','consent','share']
+
+          for name in names:
+              old = "onclick=\"document.getElementById('lx-ui-" + name + "')?.scrollIntoView({behavior:'smooth',block:'start'})\""
+              new = "onclick=\"window.lxOpenMemberPanel('" + name + "')\""
+
+              if s.count(old) != 1:
+                  raise SystemExit(
+                      'Expected one button for ' + name +
+                      ', found ' + str(s.count(old))
+                  )
+
+              s = s.replace(old, new, 1)
+
+              marker = '<section id="lx-ui-' + name + '" style="scroll-margin-top:130px">'
+              replacement = '<section id="lx-ui-' + name + '" style="display:none;scroll-margin-top:130px">'
+
+              if s.count(marker) != 1:
+                  raise SystemExit('Expected one panel for ' + name)
+
+              s = s.replace(marker, replacement, 1)
+
+          script = '''
+          window.lxOpenMemberPanel=function(name){
+            var names=['profile','phone','consent','share'];
+
+            if(names.indexOf(name)<0)return;
+
+            var target=document.getElementById('lx-ui-'+name);
+
+            if(!target){
+              alert('功能尚未載入，請重新整理頁面');
+              return;
+            }
+
+            var wasVisible=target.style.display!=='none';
+
+            names.forEach(function(n){
+              var el=document.getElementById('lx-ui-'+n);
+              if(el)el.style.display='none';
+            });
+
+            if(!wasVisible){
+              target.style.display='block';
+
+              requestAnimationFrame(function(){
+                target.scrollIntoView({
+                  behavior:'smooth',
+                  block:'start'
+                });
+              });
+            }
+          };
+          '''
+
+          s += '\n' + script
+          p.write_text(s, encoding='utf-8')
+
+          print('UI-001 navigation installed; preview only')
+          PY
+
+      - name: Check JavaScript syntax
+        run: node --check mod-preview/js/legacy-01.js
+
+      - name: Commit preview changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add mod-preview/js/legacy-01.js
+          git diff --cached --check
+
+          if ! git diff --cached --quiet; then
+            git commit -m "UI-001 show one member panel at a time in preview"
+            git push
+          fi
