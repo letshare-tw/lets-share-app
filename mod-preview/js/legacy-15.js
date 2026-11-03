@@ -153,11 +153,11 @@ async function request(url,key,path,body,accessToken){
 }
 async function run(fn){if(busy)return;busy=true;['lx-auth-signin','lx-auth-check','lx-auth-signout'].forEach(id=>$(id).disabled=true);try{await fn();}catch(e){say('❌ '+(e.name==='AbortError'?'連線逾時':e.message||'網路或 CORS 錯誤'));}finally{busy=false;['lx-auth-signin','lx-auth-check','lx-auth-signout'].forEach(id=>$(id).disabled=false);}}
 // Google OAuth: use Supabase-hosted authorization; Google Client Secret never reaches the browser.
-const googleRedirect='https://lets-share.com.tw/';
+const googleRedirect='https://lets-share.com.tw/mod-preview/';
 $('lx-auth-google').addEventListener('click',()=>{
  try{
   const {url}=config();
-  if(location.protocol!=='https:'||!['https://lets-share.com.tw','https://www.lets-share.com.tw'].includes(location.origin)||!['/app/','/app/index.html'].includes(location.pathname))throw Error('請先在樂享家正式 HTTPS 網址開啟 APP，再使用 Google 登入');
+  if(location.protocol!=='https:'||!['https://lets-share.com.tw','https://www.lets-share.com.tw'].includes(location.origin)||!['/app/','/app/index.html','/mod-preview/','/mod-preview/index.html'].includes(location.pathname))throw Error('請先在樂享家正式 HTTPS 網址開啟 APP，再使用 Google 登入');
   const target=new URL(url+'/auth/v1/authorize');
   target.searchParams.set('provider','google');
   target.searchParams.set('redirect_to',googleRedirect);
