@@ -1,0 +1,92 @@
+
+name: UI-001 Phone Status Cleanup (Preview Only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fix phone verification display
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('mod-preview/js/legacy-15.js')
+          s = p.read_text(encoding='utf-8')
+
+          old_status = (
+              "const otpStatus=u=>{const phone=u?.phone||'';"
+              "const verified=!!(phone&&u?.phone_confirmed_at);"
+              "return verified?"
+              "`✅ Supabase 已確認測試手機：${escapeHTML(phone)}"
+              "（非真實門號持有證明）`:"
+              "'尚未完成手機驗證';};"
+          )
+
+          new_status = (
+              "const otpStatus=u=>{"
+              "const phone=String(u?.phone||'');"
+              "const verified=!!(phone&&u?.phone_confirmed_at);"
+              "if(!verified)return '尚未完成手機驗證';"
+              "const digits=phone.replace(/\\D/g,'');"
+              "if(digits==='886900000001')"
+              "return '⚠️ 測試號碼已確認，不能作為真實手機驗證';"
+              "return '✅ 手機已驗證（Supabase Auth 已確認）';"
+              "};"
+          )
+
+          old_help = (
+              "請先儲存上方會員手機資料，再按"
+              "「發送驗證碼」。目前使用 Supabase 測試號碼，"
+              "不會收到真實簡訊；固定測試碼請依管理後台"
+              "設定輸入。測試成功不等於持有真實手機。"
+          )
+
+          new_help = (
+              "已完成手機驗證的會員無須重複發送驗證碼。"
+              "尚未驗證者，請先確認會員基本資料中的手機號碼。"
+              "測試號碼不代表真實門號持有證明；"
+              "手機驗證與正式會員資格審核分別處理。"
+          )
+
+          if old_status not in s:
+              raise SystemExit(
+                  '找不到原始 OTP 狀態程式，停止修改'
+              )
+
+          if old_help not in s:
+              raise SystemExit(
+                  '找不到原始 OTP 說明，停止修改'
+              )
+
+          s = s.replace(old_status, new_status, 1)
+          s = s.replace(old_help, new_help, 1)
+
+          p.write_text(s, encoding='utf-8')
+          print('Phone status UI updated in preview')
+          PY
+
+      - name: Validate JavaScript
+        run: node --check mod-preview/js/legacy-15.js
+
+      - name: Commit preview changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add mod-preview/js/legacy-15.js
+          git diff --cached --check
+
+          if ! git diff --cached --quiet; then
+            git commit -m "UI-001 clarify phone verification status"
+            git push
+          fi
