@@ -5,24 +5,24 @@ ${window.lxMemberBanner?window.lxMemberBanner():''}
   <b style="font-size:18px">帳戶與會員服務</b>
   <p class="muted" style="font-size:13px">管理基本資料、手機安全與分享紀錄</p>
   <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px">
-    <button type="button" onclick="document.getElementById('lx-ui-profile')?.scrollIntoView({behavior:'smooth',block:'start'})" style="padding:16px 8px;border:1px solid #dce9e1;border-radius:16px;background:#f8fcfa;color:#245a42">
+    <button type="button" onclick="window.lxOpenMemberPanel('profile')" style="padding:16px 8px;border:1px solid #dce9e1;border-radius:16px;background:#f8fcfa;color:#245a42">
       <span style="display:block;font-size:27px">👤</span>基本資料
     </button>
-    <button type="button" onclick="document.getElementById('lx-ui-phone')?.scrollIntoView({behavior:'smooth',block:'start'})" style="padding:16px 8px;border:1px solid #dce9e1;border-radius:16px;background:#f8fcfa;color:#245a42">
+    <button type="button" onclick="window.lxOpenMemberPanel('phone')" style="padding:16px 8px;border:1px solid #dce9e1;border-radius:16px;background:#f8fcfa;color:#245a42">
       <span style="display:block;font-size:27px">📱</span>手機驗證
     </button>
-    <button type="button" onclick="document.getElementById('lx-ui-consent')?.scrollIntoView({behavior:'smooth',block:'start'})" style="padding:16px 8px;border:1px solid #dce9e1;border-radius:16px;background:#f8fcfa;color:#245a42">
+    <button type="button" onclick="window.lxOpenMemberPanel('consent')" style="padding:16px 8px;border:1px solid #dce9e1;border-radius:16px;background:#f8fcfa;color:#245a42">
       <span style="display:block;font-size:27px">📄</span>會員文件
     </button>
-    <button type="button" onclick="document.getElementById('lx-ui-share')?.scrollIntoView({behavior:'smooth',block:'start'})" style="padding:16px 8px;border:1px solid #dce9e1;border-radius:16px;background:#f8fcfa;color:#245a42">
+    <button type="button" onclick="window.lxOpenMemberPanel('share')" style="padding:16px 8px;border:1px solid #dce9e1;border-radius:16px;background:#f8fcfa;color:#245a42">
       <span style="display:block;font-size:27px">📦</span>分享紀錄
     </button>
   </div>
 </div>
-<section id="lx-ui-profile" style="scroll-margin-top:130px">${window.lxProfileEditor?window.lxProfileEditor():''}</section>
-<section id="lx-ui-phone" style="scroll-margin-top:130px">${window.lxOtpCard?window.lxOtpCard():''}</section>
-<section id="lx-ui-consent" style="scroll-margin-top:130px">${window.lxConsentCard?window.lxConsentCard():''}</section>
-<section id="lx-ui-share" style="scroll-margin-top:130px">${window.lxMyShareBagsCard?window.lxMyShareBagsCard():''}</section>
+<section id="lx-ui-profile" style="display:none;scroll-margin-top:130px">${window.lxProfileEditor?window.lxProfileEditor():''}</section>
+<section id="lx-ui-phone" style="display:none;scroll-margin-top:130px">${window.lxOtpCard?window.lxOtpCard():''}</section>
+<section id="lx-ui-consent" style="display:none;scroll-margin-top:130px">${window.lxConsentCard?window.lxConsentCard():''}</section>
+<section id="lx-ui-share" style="display:none;scroll-margin-top:130px">${window.lxMyShareBagsCard?window.lxMyShareBagsCard():''}</section>
 <details class="card" style="padding:14px;margin:14px 0">
   <summary style="cursor:pointer;font-weight:600;color:#526e5e">開發測試與註冊狀態</summary>
   ${window.lxOnboardCard?window.lxOnboardCard():''}
@@ -166,3 +166,35 @@ const v02render=render;
 render=function(){if(page==='v03'){document.getElementById('app').innerHTML=v03page();nav();v031photoInfo()}else v02render()};
 
 render();
+
+
+window.lxOpenMemberPanel=function(name){
+  var names=['profile','phone','consent','share'];
+
+  if(names.indexOf(name)<0)return;
+
+  var target=document.getElementById('lx-ui-'+name);
+
+  if(!target){
+    alert('功能尚未載入，請重新整理頁面');
+    return;
+  }
+
+  var wasVisible=target.style.display!=='none';
+
+  names.forEach(function(n){
+    var el=document.getElementById('lx-ui-'+n);
+    if(el)el.style.display='none';
+  });
+
+  if(!wasVisible){
+    target.style.display='block';
+
+    requestAnimationFrame(function(){
+      target.scrollIntoView({
+        behavior:'smooth',
+        block:'start'
+      });
+    });
+  }
+};
