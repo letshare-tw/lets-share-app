@@ -1,0 +1,14 @@
+
+/* V0.6.3f: bag-hub-only clean green outline icons, without colored icon squares */
+.lx-bag-hub .lx-hq-icon,
+.lx-bag-hub .lx-hq-tile:nth-child(n) .lx-hq-icon {
+ background:#00a96d!important;color:#fff!important;border-radius:13px;
+ width:47px;height:47px;display:flex;align-items:center;justify-content:center;
+ box-shadow:0 2px 5px #00000012!important;
+}
+.lx-bag-hub .lx-hq-tile:nth-child(2) .lx-hq-icon{background:#f3a900!important}
+.lx-bag-hub .lx-hq-tile:nth-child(3) .lx-hq-icon{background:#1196d5!important}
+.lx-bag-hub .lx-hq-tile:nth-child(4) .lx-hq-icon{background:#079c63!important}
+.lx-bag-hub .lx-hq-tile:nth-child(5) .lx-hq-icon{background:#f04467!important}
+.lx-bag-hub .lx-hq-tile:nth-child(6) .lx-hq-icon{background:#8651d6!important}
+.lx-bag-hub .lx-hq-icon svg {width:29px;height:29px;display:block;flex-shrink:0;stroke:currentColor}

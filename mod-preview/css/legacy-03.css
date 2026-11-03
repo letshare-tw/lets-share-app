@@ -1,0 +1,16 @@
+
+/* 分類頁的照片容器，以及商品詳情多圖相簿 */
+.product .art{position:relative;overflow:hidden;aspect-ratio:1/1;min-height:0}
+.product .art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;display:block}
+.detailart.v052-gallery{display:flex;flex-direction:column;align-items:stretch;gap:10px;aspect-ratio:auto;height:auto;max-height:none;overflow:visible;background:transparent;font-size:initial;border-radius:0}
+.v052-main{position:relative;width:100%;aspect-ratio:4/5;max-height:520px;overflow:hidden;background:#f2f4f1;border-radius:18px;display:flex;align-items:center;justify-content:center}
+.v052-main img{position:static!important;inset:auto!important;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;display:block;background:transparent}
+.v052-counter{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:#222b;color:white;padding:5px 12px;border-radius:20px;font-size:12px;white-space:nowrap}
+.v052-main button{position:absolute;top:50%;transform:translateY(-50%);background:#fffffff0;color:#17784e;border:0;border-radius:50%;width:36px;height:36px;font-size:28px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 6px #0002}
+.v052-main button:first-of-type{left:8px}.v052-main button:last-of-type{right:8px}
+.v052-thumbnails{display:flex;gap:9px;overflow-x:auto;padding:2px 0 8px;max-width:100%}
+.v052-mini{flex:0 0 75px;border:2px solid transparent;border-radius:10px;padding:3px;background:white;overflow:hidden;color:#59645d;font-size:12px}
+.v052-mini.on{border-color:#078a50;color:#078a50;font-weight:700}
+.v052-mini img{display:block;position:static!important;width:100%;height:64px;object-fit:cover;border-radius:6px}
+.v052-mini span{display:block;padding-top:3px}
+.v052-no-photo{font-size:14px;color:#65746b;padding:24px;text-align:center}

@@ -1,0 +1,13 @@
+
+/* V0.6.3p: HQ order-stage colored icon tiles; functional onclicks unchanged */
+.lx-order-stages{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}
+.lx-order-stages>button.lx-stage-tile{display:flex!important;align-items:center!important;gap:10px!important;text-align:left!important;min-height:84px!important;padding:10px!important;border-radius:17px!important;color:#192e29!important;font-size:16px!important;border:1px solid var(--lx-border,#dcece7)!important;box-shadow:none!important}
+.lx-stage-tile .lx-stage-icon{width:51px;height:51px;min-width:51px;display:grid;place-items:center;border-radius:14px;color:white}
+.lx-stage-tile svg{width:29px;height:29px;stroke:currentColor;stroke-width:2.5;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.lx-stage-tile .lx-stage-label{display:flex;flex-direction:column;gap:2px;font-weight:800;line-height:1.25}
+.lx-stage-tile .lx-stage-count{font-size:14px;font-weight:650;color:#586762}
+.lx-stage-tile[data-stage=receive]{background:#e9f6ff!important;border-color:#c8e9ff!important}.lx-stage-tile[data-stage=receive] .lx-stage-icon{background:#159be5}
+.lx-stage-tile[data-stage=pick]{background:#fff5e4!important;border-color:#ffe5b8!important}.lx-stage-tile[data-stage=pick] .lx-stage-icon{background:#f5a400}
+.lx-stage-tile[data-stage=ship]{background:#e7f9f0!important;border-color:#c8ecdc!important}.lx-stage-tile[data-stage=ship] .lx-stage-icon{background:#079966}
+.lx-stage-tile[data-stage=done]{background:#f4edff!important;border-color:#e2d2ff!important}.lx-stage-tile[data-stage=done] .lx-stage-icon{background:#8444db}
+.lx-stage-tile.lx-stage-selected{outline:2px solid #087e56;outline-offset:-2px}

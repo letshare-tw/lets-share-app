@@ -1,0 +1,7 @@
+
+.v046quick{margin:14px 0 16px}
+.v046quicktitle{font-size:14px;color:#68766d;margin-bottom:9px;font-weight:600}
+.v046quickgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.v046pricebtn{border:1.5px solid #078a50;background:#fff;color:#078a50;border-radius:12px;min-height:48px;padding:8px 0;font-size:16px;font-weight:700;cursor:pointer;touch-action:manipulation}
+.v046pricebtn.selected,.v046pricebtn:active{background:#078a50;color:white}
+@media(max-width:370px){.v046quickgrid{gap:4px}.v046pricebtn{font-size:14px;min-height:46px}}

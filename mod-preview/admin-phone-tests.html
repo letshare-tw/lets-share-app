@@ -1,0 +1,317 @@
+
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>樂享家｜手機測試帳號管理</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#078b50;color:#173b2a;font-family:system-ui,"Noto Sans TC",sans-serif}
+main{max-width:620px;margin:auto;padding:22px 15px 50px}
+header{text-align:center;color:white;margin-bottom:22px}
+h1{font-size:27px;margin:5px}
+header p{font-size:14px}
+section{background:white;border-radius:20px;padding:20px;margin:15px 0}
+h2{font-size:20px;margin:0 0 15px}
+p{line-height:1.7}
+label{display:block;margin-top:12px;font-size:14px;font-weight:600}
+input{width:100%;padding:13px;margin-top:6px;border:1px solid #c7d8cd;border-radius:10px;font-size:16px}
+button,.link{display:block;width:100%;padding:13px;margin-top:12px;border:0;border-radius:12px;background:#078b50;color:white;font-size:15px;font-weight:700;text-align:center;text-decoration:none}
+button:disabled{opacity:.5}
+.secondary{background:#eaf4ed;color:#17643f}
+.danger{background:#fff0e8;color:#9b3e25}
+.small{font-size:13px;color:#64776c}
+.item{padding:15px 0;border-top:1px solid #e1e9e3;overflow-wrap:anywhere}
+.item strong{display:block;margin-bottom:5px}
+.tag{display:inline-block;background:#e5f4e9;border-radius:8px;padding:4px 9px;font-size:12px;margin:5px 4px 5px 0}
+.off{background:#fff0e8}
+#status{padding:13px;border-radius:10px;background:#edf5ef;white-space:pre-wrap;overflow-wrap:anywhere}
+.error{background:#fff0e8!important;color:#9b3e25}
+.hidden{display:none}
+footer{text-align:center;color:white;font-size:12px;margin-top:22px}
+</style>
+</head>
+<body>
+<main>
+<header>
+<h1>樂享家</h1>
+<p>總部管理｜手機認證測試例外</p>
+</header>
+
+<section>
+<h2>管理員驗證</h2>
+<div id="identity" class="small">正在確認登入狀態…</div>
+<div id="status">讀取中…</div>
+</section>
+
+<div id="admin" class="hidden">
+<section>
+<h2>新增測試帳號</h2>
+<p class="small">
+只能新增已經建立樂享家登入帳號的會員。
+新增後將同時啟用測試白名單及手機認證例外。
+</p>
+
+<label for="email">會員 Email</label>
+<input id="email" type="email" autocomplete="off"
+placeholder="輸入已註冊的 Email">
+
+<label for="reason">核准原因</label>
+<input id="reason" maxlength="300"
+value="總部核准開發測試">
+
+<button id="add" type="button">新增並核准測試帳號</button>
+</section>
+
+<section>
+<h2>測試帳號清單</h2>
+<p class="small">
+只有總部管理員可以查看及修改。
+停用手機例外不會刪除會員帳號。
+</p>
+<button id="refresh" class="secondary" type="button">
+重新整理清單
+</button>
+<div id="accounts">正在載入…</div>
+</section>
+</div>
+
+<a class="link secondary" href="./">返回樂享家 APP</a>
+<footer>樂享家總部｜開發測試管理</footer>
+</main>
+
+<script>
+(()=>{
+"use strict";
+
+const BASE="https://wxvauoeykusmbxdtwgxo.supabase.co";
+const KEY="sb_publishable_ZCqKEuqpTiZ46p9fx_JXvA_av4JwD3I";
+const STORE="lx_supabase_auth_v066g";
+const $=id=>document.getElementById(id);
+
+let token=null;
+let busy=false;
+
+function show(text,error=false){
+ $("status").textContent=text;
+ $("status").className=error?"error":"";
+}
+
+function session(){
+ try{
+  return JSON.parse(sessionStorage.getItem(STORE)||"null");
+ }catch{
+  return null;
+ }
+}
+
+async function rpc(name,body={}){
+ if(!token)throw Error("尚未登入");
+
+ const res=await fetch(BASE+"/rest/v1/rpc/"+name,{
+  method:"POST",
+  headers:{
+   apikey:KEY,
+   Authorization:"Bearer "+token,
+   "Content-Type":"application/json"
+  },
+  body:JSON.stringify(body)
+ });
+
+ if(!res.ok){
+  let msg="";
+  try{
+   const j=await res.json();
+   msg=j.message||j.error||"";
+  }catch{}
+  throw Error(msg||"伺服器錯誤："+res.status);
+ }
+
+ const text=await res.text();
+ return text?JSON.parse(text):null;
+}
+
+function element(tag,text,className){
+ const el=document.createElement(tag);
+ if(text!==undefined)el.textContent=text;
+ if(className)el.className=className;
+ return el;
+}
+
+async function load(){
+ const list=$("accounts");
+ list.replaceChildren(element("p","正在讀取…","small"));
+
+ try{
+  const rows=await rpc("lx_admin_phone_test_accounts");
+
+  list.replaceChildren();
+
+  if(!rows||!rows.length){
+   list.append(element("p","目前沒有測試帳號。","small"));
+   return;
+  }
+
+  for(const a of rows){
+   const item=element("div",undefined,"item");
+
+   item.append(element("strong",a.email||"未設定 Email"));
+   item.append(element("div","會員 ID："+a.user_id,"small"));
+
+   item.append(element(
+    "span",
+    a.test_access_enabled?"測試白名單啟用":"測試白名單停用",
+    "tag"+(a.test_access_enabled?"":" off")
+   ));
+
+   item.append(element(
+    "span",
+    a.phone_exception_enabled?"手機例外啟用":"手機例外停用",
+    "tag"+(a.phone_exception_enabled?"":" off")
+   ));
+
+   item.append(element(
+    "span",
+    a.registration_completed?"會員註冊完成":"會員註冊未完成",
+    "tag"+(a.registration_completed?"":" off")
+   ));
+
+   if(a.reason){
+    item.append(element("p","原因："+a.reason,"small"));
+   }
+
+   const btn=element(
+    "button",
+    a.phone_exception_enabled?"停用手機測試例外":"啟用手機測試例外",
+    a.phone_exception_enabled?"danger":"secondary"
+   );
+
+   if(!a.test_access_enabled&&!a.phone_exception_enabled){
+    btn.disabled=true;
+    btn.textContent="須先啟用測試白名單";
+   }
+
+   btn.onclick=async()=>{
+    if(busy)return;
+
+    const enable=!a.phone_exception_enabled;
+
+    if(!confirm(
+     (enable?"啟用":"停用")+"此帳號的手機測試例外？\n"+
+     (a.email||a.user_id)
+    ))return;
+
+    const reason=prompt(
+     "請輸入操作原因（至少 3 字）",
+     enable?"總部核准測試":"總部停用測試例外"
+    );
+
+    if(reason===null)return;
+    if(reason.trim().length<3){
+     show("操作原因至少需要 3 字",true);
+     return;
+    }
+
+    busy=true;
+    btn.disabled=true;
+
+    try{
+     await rpc("lx_admin_set_phone_test_exception",{
+      p_user_id:a.user_id,
+      p_enabled:enable,
+      p_reason:reason.trim()
+     });
+
+     show("✓ 已更新手機測試例外資格");
+     await load();
+
+    }catch(e){
+     show("更新失敗："+e.message,true);
+    }finally{
+     busy=false;
+     btn.disabled=false;
+    }
+   };
+
+   item.append(btn);
+   list.append(item);
+  }
+
+ }catch(e){
+  list.replaceChildren();
+  list.append(element("p","讀取失敗："+e.message,"small"));
+  show("無法讀取測試帳號："+e.message,true);
+ }
+}
+
+$("add").onclick=async()=>{
+ if(busy)return;
+
+ const email=$("email").value.trim();
+ const reason=$("reason").value.trim();
+
+ if(!email.includes("@")){
+  show("請輸入有效的會員 Email",true);
+  return;
+ }
+
+ if(reason.length<3){
+  show("核准原因至少需要 3 字",true);
+  return;
+ }
+
+ if(!confirm("確認新增測試帳號？\n"+email))return;
+
+ busy=true;
+ $("add").disabled=true;
+
+ try{
+  await rpc("lx_admin_add_phone_test_account",{
+   p_email:email,
+   p_reason:reason
+  });
+
+  show("✓ 已新增測試帳號並核准手機例外");
+  $("email").value="";
+  await load();
+
+ }catch(e){
+  show("新增失敗："+e.message,true);
+ }finally{
+  busy=false;
+  $("add").disabled=false;
+ }
+};
+
+$("refresh").onclick=load;
+
+async function init(){
+ const s=session();
+ token=s?.token||null;
+
+ if(!token){
+  $("identity").textContent="尚未登入";
+  show("請先登入樂享家 APP，並從同一瀏覽器分頁開啟此管理頁。",true);
+  return;
+ }
+
+ $("identity").textContent="已偵測到登入狀態，正在確認總部管理權限…";
+
+ try{
+  await rpc("lx_admin_phone_test_accounts");
+  $("identity").textContent="✓ 總部管理員權限確認通過";
+  $("admin").classList.remove("hidden");
+  show("管理後台已就緒");
+  await load();
+ }catch(e){
+  $("identity").textContent="管理員權限驗證未通過";
+  show("無法進入管理後台："+e.message,true);
+ }
+}
+
+init();
+})();
+</script>
+</body>
+</html>
