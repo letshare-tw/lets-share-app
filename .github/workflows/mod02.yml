@@ -82,7 +82,7 @@ jobs:
 
           output = pattern.sub(replace, original)
 
-          assert counts['style'] == 15, counts
+          assert counts['style'] == 14, counts
           assert counts['script'] == 20, counts
           assert 'lx-test-gate.js' in output
 
