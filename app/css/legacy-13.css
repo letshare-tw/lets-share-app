@@ -1,0 +1,7 @@
+
+#lx-connect-toggle{display:none;position:fixed;bottom:16px;right:16px;z-index:2147483000;background:#087d49;color:#fff;border:2px solid #fff;border-radius:24px;padding:11px 16px;box-shadow:0 3px 15px #0003;font-size:14px}
+#lx-connect-panel{display:none;position:fixed;inset:12px 10px auto 10px;max-height:calc(100dvh - 36px);overflow:auto;max-width:460px;margin-left:auto;z-index:2147483000;background:#fff;color:#203129;border:1px solid #d8e2da;border-radius:18px;padding:18px;box-shadow:0 10px 40px #0004;font:14px/1.6 system-ui,'Noto Sans TC',sans-serif}
+#lx-connect-panel input{width:100%;padding:10px;border:1px solid #b7c6bc;border-radius:8px;margin:4px 0 10px;font-size:14px}
+#lx-connect-panel button{padding:9px 12px;border:0;border-radius:8px;background:#087d49;color:white;margin-right:8px}
+#lx-connect-panel .secondary{background:#edf1ee;color:#203129}
+#lx-connect-result{white-space:pre-wrap;word-break:break-word;background:#f2f6f3;padding:10px;border-radius:8px;margin-top:10px;max-height:160px;overflow:auto}

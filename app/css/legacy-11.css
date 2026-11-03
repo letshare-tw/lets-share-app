@@ -1,0 +1,22 @@
+
+/* V0.6.2j: shared role dashboard visual treatment; only the dashboard appearance changes. */
+.lx-role-colorful{background:linear-gradient(145deg,#f0faf5,#f9fcfa);border:1px solid #d7e9dd;border-radius:22px;padding:12px}
+.lx-role-colorful .lx-hq-head{background:linear-gradient(125deg,#07935b,#006d48);border-radius:19px;padding:23px 17px;margin:0 0 15px;box-shadow:0 5px 16px #006c4720}
+.lx-role-colorful .lx-hq-head h2{color:white;margin:0 0 10px;font-size:25px}
+.lx-role-colorful .lx-hq-head p{color:white!important;opacity:.95;font-size:13px}
+.lx-role-colorful .lx-hq-tile{min-height:155px;padding:15px 11px;border-radius:19px;border:1.5px solid #d5e8df;background:linear-gradient(155deg,#fff 10%,#e4f8ee);box-shadow:0 4px 12px #136e4414;transition:transform .13s}
+.lx-role-colorful .lx-hq-tile:active{transform:scale(.975)}
+.lx-role-colorful .lx-hq-tile:nth-child(2){background:linear-gradient(155deg,#fff 10%,#fff1d7);border-color:#f1e2c6}
+.lx-role-colorful .lx-hq-tile:nth-child(3){background:linear-gradient(155deg,#fff 10%,#e1f3ff);border-color:#d5e7f6}
+.lx-role-colorful .lx-hq-tile:nth-child(4){background:linear-gradient(155deg,#fff 10%,#e2f6ec);border-color:#d1e9dc}
+.lx-role-colorful .lx-hq-tile:nth-child(5){background:linear-gradient(155deg,#fff 10%,#ffe5e9);border-color:#f3d9df}
+.lx-role-colorful .lx-hq-tile:nth-child(6){background:linear-gradient(155deg,#fff 10%,#efe6ff);border-color:#e3d8f4}
+.lx-role-colorful .lx-hq-icon{display:flex;align-items:center;justify-content:center;width:47px;height:47px;border-radius:13px;background:#00a96d;color:white;font-size:27px;line-height:1}
+.lx-role-colorful .lx-hq-tile:nth-child(2) .lx-hq-icon{background:#f3a900}
+.lx-role-colorful .lx-hq-tile:nth-child(3) .lx-hq-icon{background:#1196d5}
+.lx-role-colorful .lx-hq-tile:nth-child(4) .lx-hq-icon{background:#079c63}
+.lx-role-colorful .lx-hq-tile:nth-child(5) .lx-hq-icon{background:#f04467}
+.lx-role-colorful .lx-hq-tile:nth-child(6) .lx-hq-icon{background:#8651d6}
+.lx-role-colorful .lx-hq-name{font-size:18px;color:#192b27;margin:12px 0 6px}
+.lx-role-colorful .lx-hq-desc{font-size:12px;color:#65736c;line-height:1.5}
+@media(max-width:370px){.lx-role-colorful{padding:9px}.lx-role-colorful .lx-hq-grid{gap:8px}.lx-role-colorful .lx-hq-tile{padding:12px 9px;min-height:148px}.lx-role-colorful .lx-hq-name{font-size:16px}}
