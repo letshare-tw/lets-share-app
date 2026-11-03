@@ -1,0 +1,124 @@
+
+name: MOD-02 Safe modularization candidate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate isolated modularized candidate
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import re
+          import pathlib
+          import hashlib
+
+          root = pathlib.Path('app')
+          source = root / 'index.html'
+          original = source.read_text(encoding='utf-8')
+
+          pattern = re.compile(
+              r'<(style|script)\b([^>]*)>([\s\S]*?)</\1\s*>',
+              re.I
+          )
+
+          counts = {'style': 0, 'script': 0}
+          records = []
+
+          def replace(m):
+              kind = m.group(1).lower()
+              attrs = m.group(2)
+              body = m.group(3)
+
+              if kind == 'script' and re.search(
+                  r'\bsrc\s*=', attrs, re.I
+              ):
+                  return m.group(0)
+
+              counts[kind] += 1
+              num = counts[kind]
+
+              if kind == 'style':
+                  rel = f'css/legacy-{num:02d}.css'
+                  tag = (
+                      f'<link rel="stylesheet" '
+                      f'href="./{rel}">'
+                  )
+              else:
+                  rel = f'js/legacy-{num:02d}.js'
+                  tag = (
+                      f'<script src="./{rel}"'
+                      f'{attrs}></script>'
+                  )
+
+              dest = root / rel
+              dest.parent.mkdir(
+                  parents=True,
+                  exist_ok=True
+              )
+              dest.write_text(
+                  body,
+                  encoding='utf-8'
+              )
+
+              records.append((
+                  rel,
+                  hashlib.sha256(
+                      body.encode()
+                  ).hexdigest()
+              ))
+
+              return tag
+
+          output = pattern.sub(replace, original)
+
+          assert counts['style'] == 15, counts
+          assert counts['script'] == 20, counts
+          assert 'lx-test-gate.js' in output
+
+          for rel, digest in records:
+              actual = hashlib.sha256(
+                  (root / rel).read_bytes()
+              ).hexdigest()
+              assert actual == digest
+
+          source.write_text(
+              output,
+              encoding='utf-8'
+          )
+
+          report = root / 'MOD-02-REPORT.md'
+          report.write_text(
+              '# MOD-02 candidate\n\n'
+              'Isolated test branch, not main.\n\n'
+              f'Original: {len(original.encode())} bytes.\n\n'
+              f'Candidate: {len(output.encode())} bytes.\n\n'
+              f'CSS files: {counts["style"]}\n\n'
+              f'JS files: {counts["script"]}\n\n'
+              'Browser regression testing required.\n',
+              encoding='utf-8'
+          )
+
+          print(report.read_text())
+          PY
+
+      - name: Commit candidate to isolated branch
+        shell: bash
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C mod-02-candidate
+          git add app/index.html app/css app/js app/MOD-02-REPORT.md
+          git commit -m "MOD-02 extract inline CSS and JS"
+          git push --force-with-lease origin mod-02-candidate
