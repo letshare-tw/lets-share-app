@@ -1,0 +1,149 @@
+
+name: MEM-004 Member Services (Preview Only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Repair member service navigation
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('mod-preview/js/legacy-01.js')
+          s = p.read_text(encoding='utf-8')
+
+          tag = 'MEM-004 MEMBER SERVICES'
+
+          if tag in s:
+              print('MEM-004 already installed')
+              raise SystemExit(0)
+
+          old = (
+              "['我的訂單','orders'],"
+              "['我分享的衣物','share'],"
+              "['我的現金回饋','wallet'],"
+              "['我的收藏','favorites']"
+          )
+          new = (
+              "['我的訂單','orders'],"
+              "['我分享的衣物','myshares'],"
+              "['我的現金回饋','wallet'],"
+              "['我的收藏','favorites']"
+          )
+
+          if s.count(old) != 1:
+              raise SystemExit('Member buttons not found')
+          s = s.replace(old, new, 1)
+
+          marker = 'function wallet(){'
+          if s.count(marker) != 1:
+              raise SystemExit('Wallet function not found')
+
+          pages = """
+          /* MEM-004 MEMBER SERVICES */
+          function lxMemberBack(){
+            return '<button type="button" class="iconbtn" onclick="go(\\'me\\')">← 返回會員中心</button>';
+          }
+          function orders(){
+            return headerMarkup('我的訂單')+
+              '<main class="main">'+lxMemberBack()+
+              '<h2 class="title">我的訂單</h2>'+
+              '<div class="card">'+
+              '<b>訂單紀錄</b>'+
+              '<p class="muted">真實訂單資料尚未接入此頁。</p>'+
+              '<p class="muted">目前不顯示模擬訂單，避免與實際交易混淆。</p>'+
+              '<button class="primary" onclick="go(\\'categories\\')">瀏覽商品</button>'+
+              '</div></main>';
+          }
+          function myshares(){
+            return headerMarkup('我分享的衣物')+
+              '<main class="main">'+lxMemberBack()+
+              '<h2 class="title">我分享的衣物</h2>'+
+              '<div class="card">'+
+              '<b>我的分享紀錄</b>'+
+              '<p class="muted">此頁正在整合會員專屬分享紀錄。</p>'+
+              '<p class="muted">尚未連接真實資料前，不顯示模擬件數。</p>'+
+              '<button class="primary" onclick="go(\\'share\\')">新增衣物分享</button>'+
+              '</div></main>';
+          }
+          """
+
+          s = s.replace(marker, pages + marker, 1)
+
+          start = s.index('function wallet(){')
+          end = s.index('function favorites(){', start)
+
+          wallet = """
+          function wallet(){
+            return headerMarkup('我的現金回饋')+
+              '<main class="main">'+lxMemberBack()+
+              '<h2 class="title">我的現金回饋</h2>'+
+              '<div class="card">'+
+              '<b>回饋帳務資料尚未接入</b>'+
+              '<p class="muted">目前不顯示示範金額，也不開放提領。</p>'+
+              '<p>分享衣物售出後，原分享者依制度取得成交金額 10% 現金回饋。</p>'+
+              '<p class="muted">正式帳務、結算與提領須由後端資料核定。</p>'+
+              '</div></main>';
+          }
+          """
+
+          s = s[:start] + wallet + s[end:]
+
+          route = 'home,categories,product,share,cart,me,wallet,favorites,work}[page]'
+          if s.count(route) != 1:
+              raise SystemExit('Render route not found')
+
+          s = s.replace(
+              route,
+              'home,categories,product,share,cart,me,orders,myshares,wallet,favorites,work}[page]',
+              1
+          )
+
+          p.write_text(s, encoding='utf-8')
+          print('MEM-004 navigation installed')
+          PY
+
+      - name: Check JavaScript syntax
+        run: node --check mod-preview/js/legacy-01.js
+
+      - name: Verify member routes
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s = Path('mod-preview/js/legacy-01.js').read_text()
+          required = [
+              'function orders(){',
+              'function myshares(){',
+              'function wallet(){',
+              'function favorites(){',
+              "['我分享的衣物','myshares']",
+              'me,orders,myshares,wallet,favorites,work}[page]'
+          ]
+          for item in required:
+              if item not in s:
+                  raise SystemExit('Missing: '+item)
+          print('All four member routes checked')
+          PY
+
+      - name: Commit preview changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mod-preview/js/legacy-01.js
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m "MEM-004 repair member service navigation"
+            git push
+          fi
