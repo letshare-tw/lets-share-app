@@ -1,1 +1,74 @@
-{code}
+name: MOD-04 Preview navigation fix
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-navigation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Fix preview navigation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('mod-preview/js/legacy-17.js')
+          s = p.read_text(encoding='utf-8')
+
+          start = s.index(
+              ' window.lxOnboardJump=function(target){'
+          )
+          end = s.index('\n };', start) + len('\n };')
+
+          replacement = """
+           window.lxOnboardJump=function(target){
+             const ids={
+               profile:'lx-profile-save',
+               otp:'lx-otp-send',
+               consent:'lx-consent-terms-status'
+             };
+             const id=ids[target];
+             const anchor=id
+               ?document.getElementById(id)
+               :null;
+             if(!anchor){
+               alert('此區塊尚未載入，請稍候再試。');
+               return;
+             }
+             const card=
+               anchor.closest('section.card')||anchor;
+             card.scrollIntoView({
+               behavior:'smooth',
+               block:'center'
+             });
+           };"""
+
+          s = s[:start] + replacement + s[end:]
+          p.write_text(s, encoding='utf-8')
+          print('MOD-04 navigation patched')
+          PY
+
+      - name: Commit preview-only fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email \
+            '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- mod-preview/js/legacy-17.js
+          if git diff --cached --quiet; then
+            echo 'Already patched'
+          else
+            git commit -m 'MOD-04 fix onboarding navigation'
+            git push origin HEAD:main
+          fi
