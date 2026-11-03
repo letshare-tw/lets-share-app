@@ -24,11 +24,26 @@
   <div style="margin-top:14px;padding:12px;border:1px solid #d7e5db;border-radius:12px;font-size:12px;line-height:1.9"><b>🌱 其他身分，依需求再開通</b><br>📦 分享衣物：首次分享時確認衣物交付、不退回、轉贈回收授權及售出回饋規則。<br>🧵 樂享職人：提出工作資格申請，完成必要審核與合作契約。<br>🛵 樂享騎手：提出配送資格申請，完成駕照、車輛、必要授權及合作審核。<br><span style="color:#697b70">本區為流程說明，不會直接核發任何角色權限。</span></div>
   <p style="font-size:12px;color:#8b6427;margin-top:14px">⚠️ 目前 Supabase 固定測試手機不能通過正式註冊；正式條款、個資告知與後端核定功能尚未啟用。</p></section>`;
  };
+
  window.lxOnboardJump=function(target){
-  const phrases={profile:'會員基本資料',otp:'手機 OTP 驗證',consent:'會員文件閱讀與確認',registration:'會員註冊進度'};
-  const phrase=phrases[target];
-  const cards=Array.from(document.querySelectorAll('section.card'));
-  const el=cards.find(x=>x.textContent?.includes(phrase)&&!x.textContent?.includes('會員註冊導覽'));
-  if(el){el.scrollIntoView({behavior:'smooth',block:'start'});}else{alert('請稍候會員資料載入，再點選前往。');}
+   const ids={
+     profile:'lx-profile-save',
+     otp:'lx-otp-send',
+     consent:'lx-consent-terms-status'
+   };
+   const id=ids[target];
+   const anchor=id
+     ?document.getElementById(id)
+     :null;
+   if(!anchor){
+     alert('此區塊尚未載入，請稍候再試。');
+     return;
+   }
+   const card=
+     anchor.closest('section.card')||anchor;
+   card.scrollIntoView({
+     behavior:'smooth',
+     block:'center'
+   });
  };
 })();
