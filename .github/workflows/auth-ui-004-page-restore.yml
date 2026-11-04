@@ -1,5 +1,5 @@
 
-name: AUTH-UI-004 Member Page Restore
+name: AUTH-UI-004 Page Restore V2
 
 on:
   workflow_dispatch:
@@ -13,114 +13,61 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Repair member page restore
+      - name: Extend page restoration
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
 
-          app=Path("mod-preview/js/legacy-01.js")
-          auth=Path("mod-preview/js/legacy-15.js")
-          s=app.read_text(encoding="utf-8")
-          a=auth.read_text(encoding="utf-8")
+          p=Path("mod-preview/js/legacy-01.js")
+          s=p.read_text(encoding="utf-8")
 
-          tag="AUTH-UI-004"
-          if tag in s and tag in a:
-              print("Already installed")
-              raise SystemExit(0)
-          if tag in s or tag in a:
-              raise SystemExit("Partial installation")
-
-          old_go="function go(p){page=p;render();window.scrollTo(0,0)}"
-          if s.count(old_go)!=1:
-              raise SystemExit("go function not found")
-
-          new_go="""
-          /* AUTH-UI-004 */
-          const lxPageKey="lx_member_page_v1";
-          const lxMemberPages=[
+          old='''const lxMemberPages=[
             "me","orders","myshares","wallet","favorites"
-          ];
-          function lxRememberPage(p){
-            const user=window.__lxRealAuth?.user;
-            if(!user?.id || !lxMemberPages.includes(p))return;
-            try{
-              sessionStorage.setItem(lxPageKey,
-                JSON.stringify({userId:user.id,page:p}));
-            }catch(e){}
-          }
-          function lxRestorePage(userId){
-            try{
-              const saved=JSON.parse(
-                sessionStorage.getItem(lxPageKey)||"null");
-              if(saved?.userId===userId &&
-                 lxMemberPages.includes(saved.page))
-                return saved.page;
-            }catch(e){}
-            return "me";
-          }
-          function lxClearPage(){
-            try{sessionStorage.removeItem(lxPageKey)}
-            catch(e){}
-          }
-          function go(p){
-            page=p;
-            lxRememberPage(p);
-            render();
-            window.scrollTo(0,0);
-          }
-          """
-          s=s.replace(old_go,new_go,1)
+          ];'''
 
-          pattern=r'if\(typeof go === "function"\)\s*\{\s*go\("me"\);\s*\}'
-          replacement='''if(typeof go === "function"){
-            go(typeof lxRestorePage==="function"
-              ? lxRestorePage(user.id) : "me");
-          }'''
-          a,count=re.subn(pattern,replacement,a,count=1)
-          if count!=1:
-              raise SystemExit("Session restore not found")
+          new='''const lxMemberPages=[
+            "home","categories","cart",
+            "me","orders","myshares","wallet","favorites"
+          ];'''
 
-          old_clear="sessionStorage.removeItem(AUTH_STORE);window.__lxRealAuth.user=null;"
-          new_clear="""sessionStorage.removeItem(AUTH_STORE);
-          if(typeof lxClearPage==='function')lxClearPage();
-          window.__lxRealAuth.user=null;"""
-          if a.count(old_clear)!=1:
-              raise SystemExit("Session cleanup not found")
-          a=a.replace(old_clear,new_clear,1)
+          if s.count(old)!=1:
+              if new in s:
+                  print("Already installed")
+                  raise SystemExit(0)
+              raise SystemExit("Page list not found")
 
-          app.write_text(s,encoding="utf-8")
-          auth.write_text(a,encoding="utf-8")
-          print("AUTH-UI-004 installed")
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding="utf-8")
+          print("AUTH-UI-004 V2 installed")
           PY
 
-      - name: Check JavaScript syntax
-        run: |
-          node --check mod-preview/js/legacy-01.js
-          node --check mod-preview/js/legacy-15.js
+      - name: Check JavaScript
+        run: node --check mod-preview/js/legacy-01.js
 
-      - name: Verify repair
+      - name: Verify routes
         run: |
           python3 - <<'PY'
           from pathlib import Path
           s=Path("mod-preview/js/legacy-01.js").read_text()
-          a=Path("mod-preview/js/legacy-15.js").read_text()
-          assert "function lxRememberPage(p)" in s
-          assert "function lxRestorePage(userId)" in s
-          assert "saved?.userId===userId" in s
-          assert "lxRestorePage(user.id)" in a
-          assert "lxClearPage()" in a
-          print("AUTH-UI-004 checks passed")
+          start=s.index("const lxMemberPages=[")
+          end=s.index("];",start)
+          routes=s[start:end]
+          for route in [
+              "home","categories","cart","me",
+              "orders","myshares","wallet","favorites"
+          ]:
+              assert '"'+route+'"' in routes,route
+          print("All supported routes verified")
           PY
 
-      - name: Commit changes
+      - name: Commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add mod-preview/js/legacy-01.js mod-preview/js/legacy-15.js
+          git add mod-preview/js/legacy-01.js
           git diff --cached --check
           if ! git diff --cached --quiet; then
-            git commit -m "AUTH-UI-004 restore member page"
+            git commit -m "AUTH-UI-004 V2 restore main pages"
             git push
           fi
