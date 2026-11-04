@@ -158,7 +158,7 @@ window.lxGoogleLogin=()=>{
   }
 };
 window.lxOpenConnectionTest=()=>{document.getElementById("lx-connect-panel").style.display="block";};
-window.lxMemberBanner=()=>{const u=window.__lxRealAuth.user;return `<section class="card" style="border:1px solid #c8dfd1;padding:15px;margin-bottom:12px"><b>💚 我的樂享家帳號</b><p class="muted" style="font-size:13px">${u?'已使用 Google／會員帳號登入：'+escapeHTML(u.email||'會員'):'登入後即可管理姓名、手機號碼與會員資料。'}</p>${u?'<button type="button" onclick="window.lxOpenMemberPanel(&quot;profile&quot;)">帳號管理</button> <button type="button" onclick="lxMemberSignOut()">登出</button>':'<button type="button" onclick="lxOpenRealLogin()">登入／註冊</button>'}${u?'<p style="font-size:12px;color:#8b671d;margin-top:10px">手機驗證：請在會員基本資料下方查看 Supabase 驗證狀態</p>':''}<p style="font-size:12px;color:#667">提醒：訂單、錢包等部分功能仍為試營運示範資料。</p></section>`};
+window.lxMemberBanner=()=>{const u=window.__lxRealAuth.user;return `<section class="card" style="border:1px solid #c8dfd1;padding:15px;margin-bottom:12px"><b>💚 我的樂享家帳號</b><p class="muted" style="font-size:13px">${u?'已使用 Google／會員帳號登入：'+escapeHTML(u.email||'會員'):'登入後即可管理姓名、手機號碼與會員資料。'}</p>${u?'<button type="button" onclick="window.lxOpenMemberPanel(&quot;profile&quot;)">帳號管理</button> <button type="button" onclick="lxMemberSignOut()">登出</button>':'<button type="button" onclick="lxGoogleLogin()">使用 Google 帳號登入／註冊</button>'}${u?'<p style="font-size:12px;color:#8b671d;margin-top:10px">手機驗證：請在會員基本資料下方查看 Supabase 驗證狀態</p>':''}<p style="font-size:12px;color:#667">提醒：訂單、錢包等部分功能仍為試營運示範資料。</p></section>`};
 function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function refreshMember(){refreshMemberView();loadRealProfile();}
 function say(s){out.textContent=s;}
