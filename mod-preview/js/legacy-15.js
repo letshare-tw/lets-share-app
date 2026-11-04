@@ -15,6 +15,10 @@ async function restoreSession(){
   if(refreshToken&&Date.now()>expiresAt-60000){const data=await request(url,key,"token?grant_type=refresh_token",{refresh_token:refreshToken});applyTokens(data);}
   const user=await request(url,key,"user",undefined,token);if(!user.id)throw Error("無法確認身分");
   window.__lxRealAuth.user={id:user.id,email:user.email||"",user_metadata:user.user_metadata||{},phone:user.phone||null,phone_confirmed_at:user.phone_confirmed_at||null};refreshMember();say("✅ 已恢復登入："+(user.email||"會員"));
+  // AUTH-UI-003: redirect only after verified session.
+  if(typeof go === "function"){
+    go("me");
+  }
  }catch(e){clearSession();say("登入狀態已失效，請重新登入。");}
 }
 
