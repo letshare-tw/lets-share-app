@@ -13,31 +13,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Restore last member page safely
+      - name: Repair member page restore
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
-          app = Path("mod-preview/js/legacy-01.js")
-          auth = Path("mod-preview/js/legacy-15.js")
-          s = app.read_text(encoding="utf-8")
-          a = auth.read_text(encoding="utf-8")
+          app=Path("mod-preview/js/legacy-01.js")
+          auth=Path("mod-preview/js/legacy-15.js")
+          s=app.read_text(encoding="utf-8")
+          a=auth.read_text(encoding="utf-8")
 
-          tag = "AUTH-UI-004"
+          tag="AUTH-UI-004"
           if tag in s and tag in a:
               print("Already installed")
               raise SystemExit(0)
           if tag in s or tag in a:
-              raise SystemExit("Partial installation detected")
+              raise SystemExit("Partial installation")
 
-          old_go = (
-              "function go(p){page=p;render();"
-              "window.scrollTo(0,0)}"
-          )
+          old_go="function go(p){page=p;render();window.scrollTo(0,0)}"
+          if s.count(old_go)!=1:
+              raise SystemExit("go function not found")
 
-          new_go = """
-          /* AUTH-UI-004: member page position */
+          new_go="""
+          /* AUTH-UI-004 */
           const lxPageKey="lx_member_page_v1";
           const lxMemberPages=[
             "me","orders","myshares","wallet","favorites"
@@ -46,21 +46,17 @@ jobs:
             const user=window.__lxRealAuth?.user;
             if(!user?.id || !lxMemberPages.includes(p))return;
             try{
-              sessionStorage.setItem(
-                lxPageKey,
-                JSON.stringify({userId:user.id,page:p})
-              );
+              sessionStorage.setItem(lxPageKey,
+                JSON.stringify({userId:user.id,page:p}));
             }catch(e){}
           }
           function lxRestorePage(userId){
             try{
               const saved=JSON.parse(
-                sessionStorage.getItem(lxPageKey)||"null"
-              );
+                sessionStorage.getItem(lxPageKey)||"null");
               if(saved?.userId===userId &&
-                 lxMemberPages.includes(saved.page)){
+                 lxMemberPages.includes(saved.page))
                 return saved.page;
-              }
             }catch(e){}
             return "me";
           }
@@ -75,37 +71,21 @@ jobs:
             window.scrollTo(0,0);
           }
           """
-
-          if s.count(old_go)!=1:
-              raise SystemExit("go() not found uniquely")
           s=s.replace(old_go,new_go,1)
 
-          old_restore = '''if(typeof go === "function"){
-            go("me");
+          pattern=r'if\(typeof go === "function"\)\s*\{\s*go\("me"\);\s*\}'
+          replacement='''if(typeof go === "function"){
+            go(typeof lxRestorePage==="function"
+              ? lxRestorePage(user.id) : "me");
           }'''
+          a,count=re.subn(pattern,replacement,a,count=1)
+          if count!=1:
+              raise SystemExit("Session restore not found")
 
-          new_restore = '''if(typeof go === "function"){
-            go(
-              typeof lxRestorePage==="function"
-                ? lxRestorePage(user.id)
-                : "me"
-            );
-          }'''
-
-          if a.count(old_restore)!=1:
-              raise SystemExit("Restore block not found")
-          a=a.replace(old_restore,new_restore,1)
-
-          old_clear = (
-              "sessionStorage.removeItem(AUTH_STORE);"
-              "window.__lxRealAuth.user=null;"
-          )
-          new_clear = (
-              "sessionStorage.removeItem(AUTH_STORE);"
-              "if(typeof lxClearPage==='function')lxClearPage();"
-              "window.__lxRealAuth.user=null;"
-          )
-
+          old_clear="sessionStorage.removeItem(AUTH_STORE);window.__lxRealAuth.user=null;"
+          new_clear="""sessionStorage.removeItem(AUTH_STORE);
+          if(typeof lxClearPage==='function')lxClearPage();
+          window.__lxRealAuth.user=null;"""
           if a.count(old_clear)!=1:
               raise SystemExit("Session cleanup not found")
           a=a.replace(old_clear,new_clear,1)
@@ -120,8 +100,7 @@ jobs:
           node --check mod-preview/js/legacy-01.js
           node --check mod-preview/js/legacy-15.js
 
-      - name: Verify patch
-        shell: bash
+      - name: Verify repair
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -132,16 +111,14 @@ jobs:
           assert "saved?.userId===userId" in s
           assert "lxRestorePage(user.id)" in a
           assert "lxClearPage()" in a
-          print("Page restore checks passed")
+          print("AUTH-UI-004 checks passed")
           PY
 
-      - name: Commit preview changes
-        shell: bash
+      - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add mod-preview/js/legacy-01.js
-          git add mod-preview/js/legacy-15.js
+          git add mod-preview/js/legacy-01.js mod-preview/js/legacy-15.js
           git diff --cached --check
           if ! git diff --cached --quiet; then
             git commit -m "AUTH-UI-004 restore member page"
