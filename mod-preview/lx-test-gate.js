@@ -263,8 +263,8 @@
     el("lx-v15-google").style.display =
       mode === "login" ? "block" : "none";
 
-    el("lx-v15-email").style.display =
-      mode === "login" ? "block" : "none";
+    /* AUTH-UI-008 */
+    el("lx-v15-email").style.display = "none";
 
     el("lx-v15-retry").style.display =
       mode === "retry" ? "block" : "none";
