@@ -195,7 +195,7 @@
           </p>
 
           <button
-            id="lx-v15-google"
+            id="lx-v15-google" style="background-color:#078b50 !important;color:#ffffff !important;border:1px solid #078b50 !important;-webkit-text-fill-color:#ffffff !important;"
             type="button"
           >
             使用 Google 帳號繼續
