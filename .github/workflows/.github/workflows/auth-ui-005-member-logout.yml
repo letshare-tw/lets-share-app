@@ -1,0 +1,108 @@
+
+name: AUTH-UI-005 Member Center Logout
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Integrate member center logout
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path=Path("mod-preview/js/legacy-15.js")
+          s=path.read_text(encoding="utf-8")
+
+          marker="AUTH-UI-005"
+          if marker in s:
+              print("Already installed")
+              raise SystemExit(0)
+
+          old_button='''<button type="button" onclick="lxOpenRealLogin()">${u?'帳號管理／登出':'登入／註冊'}</button>'''
+
+          new_button='''${u?'<button type="button" onclick="lxOpenRealLogin()">帳號管理</button> <button type="button" onclick="lxMemberSignOut()">登出</button>':'<button type="button" onclick="lxOpenRealLogin()">登入／註冊</button>'}'''
+
+          if s.count(old_button)!=1:
+              raise SystemExit("Member button not found")
+
+          s=s.replace(old_button,new_button,1)
+
+          old_handler="""$('lx-auth-signout').addEventListener('click',()=>run(async()=>{
+           if(!token){clearSession();say('目前沒有登入狀態。');return;}
+           const oldToken=token,url=sessionUrl,key=sessionKey;
+           clearSession();sessionUrl=null;sessionKey=null;$('lx-auth-password').value='';
+           try{await request(url,key,'logout',{},oldToken);say('✅ 已向 Supabase 發出登出請求，並清除本頁登入憑證。');}
+           catch(e){say('⚠️ 本頁憑證已清除，但伺服器登出未確認：'+e.message);}
+          }));"""
+
+          new_handler="""/* AUTH-UI-005: one logout flow for both interfaces */
+          window.lxMemberSignOut=()=>run(async()=>{
+            if(!token){
+              clearSession();
+              show(false);
+              if(typeof go==='function')go('home');
+              say('目前沒有登入狀態。');
+              return;
+            }
+            const oldToken=token,url=sessionUrl,key=sessionKey;
+            clearSession();
+            sessionUrl=null;
+            sessionKey=null;
+            $('lx-auth-password').value='';
+            show(false);
+            if(typeof go==='function')go('home');
+            try{
+              await request(url,key,'logout',{},oldToken);
+              say('✅ 已登出並清除本頁登入憑證。');
+            }catch(e){
+              say('⚠️ 本頁憑證已清除，但伺服器登出未確認：'+e.message);
+            }
+          });
+          $('lx-auth-signout').addEventListener(
+            'click',window.lxMemberSignOut
+          );"""
+
+          if s.count(old_handler)!=1:
+              raise SystemExit("Logout handler not found")
+
+          s=s.replace(old_handler,new_handler,1)
+          path.write_text(s,encoding="utf-8")
+          print("AUTH-UI-005 installed")
+          PY
+
+      - name: Check JavaScript syntax
+        run: node --check mod-preview/js/legacy-15.js
+
+      - name: Verify logout integration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path("mod-preview/js/legacy-15.js").read_text()
+          assert "AUTH-UI-005" in s
+          assert 'onclick="lxMemberSignOut()"' in s
+          assert "window.lxMemberSignOut=()=>run(" in s
+          assert "'click',window.lxMemberSignOut" in s
+          assert "go('home')" in s
+          assert "clearSession();" in s
+          print("AUTH-UI-005 verified")
+          PY
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mod-preview/js/legacy-15.js
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m "AUTH-UI-005 member center logout"
+            git push
+          fi
