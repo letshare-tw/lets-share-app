@@ -1,0 +1,73 @@
+
+name: AUTH-UI-003 Session Home Restore
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore member page after session validation
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("mod-preview/js/legacy-15.js")
+          s = p.read_text(encoding="utf-8")
+
+          old = '''refreshMember();say("✅ 已恢復登入："+(user.email||"會員"));'''
+
+          new = '''refreshMember();say("✅ 已恢復登入："+(user.email||"會員"));
+            // AUTH-UI-003: redirect only after verified session.
+            if(typeof go === "function"){
+              go("me");
+            }'''
+
+          if "AUTH-UI-003: redirect only after verified session." in s:
+              print("AUTH-UI-003 already installed")
+              raise SystemExit(0)
+
+          if s.count(old) != 1:
+              raise SystemExit("Expected session restore code not found")
+
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding="utf-8")
+          print("AUTH-UI-003 installed")
+          PY
+
+      - name: Check JavaScript syntax
+        run: node --check mod-preview/js/legacy-15.js
+
+      - name: Verify session restore patch
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s = Path("mod-preview/js/legacy-15.js").read_text()
+          start = s.index("async function restoreSession(){")
+          end = s.index("window.__lxProfile=", start)
+          block = s[start:end]
+          assert 'if(!user.id)throw Error' in block
+          assert 'go("me")' in block
+          assert block.index('if(!user.id)') < block.index('go("me")')
+          print("Session validation precedes member navigation")
+          PY
+
+      - name: Commit preview fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mod-preview/js/legacy-15.js
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m "AUTH-UI-003 restore member home after login"
+            git push
+          fi
