@@ -1,0 +1,84 @@
+
+name: AUTH-UI-009-FIX Green Login Button
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fix Google button and cache
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          gate = Path("mod-preview/lx-test-gate.js")
+          index = Path("mod-preview/index.html")
+
+          g = gate.read_text(encoding="utf-8")
+          h = index.read_text(encoding="utf-8")
+
+          old = 'id="lx-v15-google"'
+          new = (
+              'id="lx-v15-google" '
+              'style="background-color:#078b50 !important;'
+              'color:#ffffff !important;'
+              'border:1px solid #078b50 !important;'
+              '-webkit-text-fill-color:#ffffff !important;"'
+          )
+
+          if new not in g:
+              if g.count(old) != 1:
+                  raise SystemExit("Google button not unique")
+              g = g.replace(old, new, 1)
+
+          old_script = './lx-test-gate.js'
+          new_script = './lx-test-gate.js?v=auth-ui-009-fix'
+
+          if new_script not in h:
+              if h.count(old_script) != 1:
+                  raise SystemExit("Gate script not unique")
+              h = h.replace(old_script, new_script, 1)
+
+          gate.write_text(g, encoding="utf-8")
+          index.write_text(h, encoding="utf-8")
+
+          print("AUTH-UI-009-FIX installed")
+          PY
+
+      - name: Verify
+        shell: bash
+        run: |
+          node --check mod-preview/lx-test-gate.js
+          python3 - <<'PY'
+          from pathlib import Path
+
+          g = Path("mod-preview/lx-test-gate.js").read_text()
+          h = Path("mod-preview/index.html").read_text()
+
+          assert 'id="lx-v15-google" style=' in g
+          assert 'background-color:#078b50 !important' in g
+          assert 'color:#ffffff !important' in g
+          assert 'lx-test-gate.js?v=auth-ui-009-fix' in h
+          assert 'lx_can_access_test_app' in g
+
+          print("Verification passed")
+          PY
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mod-preview/lx-test-gate.js mod-preview/index.html
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m "AUTH-UI-009-FIX force green login button"
+            git push
+          fi
