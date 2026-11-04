@@ -1,0 +1,71 @@
+
+name: AUTH-UI-007 Google Login Entry
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Connect member login to Google OAuth
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p=Path("mod-preview/js/legacy-15.js")
+          s=p.read_text(encoding="utf-8")
+
+          old='onclick="lxOpenRealLogin()">登入／註冊'
+          new='onclick="lxGoogleLogin()">使用 Google 帳號登入／註冊'
+
+          if new in s:
+              print("Already installed")
+              raise SystemExit(0)
+
+          if s.count(old)!=1:
+              raise SystemExit("Login entry not found uniquely")
+
+          if "window.lxGoogleLogin=()=>{" not in s:
+              raise SystemExit("Google OAuth function missing")
+
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding="utf-8")
+          print("AUTH-UI-007 installed")
+          PY
+
+      - name: Check JavaScript syntax
+        run: node --check mod-preview/js/legacy-15.js
+
+      - name: Verify integration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          s=Path("mod-preview/js/legacy-15.js").read_text()
+
+          assert 'onclick="lxGoogleLogin()">使用 Google 帳號登入／註冊' in s
+          assert 'onclick="lxMemberSignOut()">登出' in s
+          assert 'lxOpenMemberPanel(&quot;profile&quot;)' in s
+          assert "window.lxGoogleLogin=()=>{" in s
+          assert "provider','google'" in s
+
+          print("AUTH-UI-007 verified")
+          PY
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mod-preview/js/legacy-15.js
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m "AUTH-UI-007 direct Google login entry"
+            git push
+          fi
