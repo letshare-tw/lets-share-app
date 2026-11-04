@@ -5,7 +5,9 @@ const $=id=>document.getElementById(id),panel=$('lx-auth-panel'),out=$('lx-auth-
 let token=null,refreshToken=null,expiresAt=0,sessionUrl=null,sessionKey=null,busy=false;
 const AUTH_STORE="lx_supabase_auth_v066g";
 function saveSession(){if(token&&refreshToken)sessionStorage.setItem(AUTH_STORE,JSON.stringify({token,refreshToken,expiresAt}));}
-function clearSession(){token=null;refreshToken=null;expiresAt=0;sessionStorage.removeItem(AUTH_STORE);window.__lxRealAuth.user=null;window.__lxProfile={id:null,display_name:null,full_name:null,phone:null,status:'idle',error:''};refreshMember();}
+function clearSession(){token=null;refreshToken=null;expiresAt=0;sessionStorage.removeItem(AUTH_STORE);
+if(typeof lxClearPage==='function')lxClearPage();
+window.__lxRealAuth.user=null;window.__lxProfile={id:null,display_name:null,full_name:null,phone:null,status:'idle',error:''};refreshMember();}
 function applyTokens(data){token=data.access_token;refreshToken=data.refresh_token||refreshToken;expiresAt=Date.now()+((Number(data.expires_in)||3600)*1000);saveSession();}
 async function restoreSession(){
  let saved;try{saved=JSON.parse(sessionStorage.getItem(AUTH_STORE)||"null");}catch{sessionStorage.removeItem(AUTH_STORE);return;}
@@ -17,8 +19,9 @@ async function restoreSession(){
   window.__lxRealAuth.user={id:user.id,email:user.email||"",user_metadata:user.user_metadata||{},phone:user.phone||null,phone_confirmed_at:user.phone_confirmed_at||null};refreshMember();say("✅ 已恢復登入："+(user.email||"會員"));
   // AUTH-UI-003: redirect only after verified session.
   if(typeof go === "function"){
-    go("me");
-  }
+  go(typeof lxRestorePage==="function"
+    ? lxRestorePage(user.id) : "me");
+}
  }catch(e){clearSession();say("登入狀態已失效，請重新登入。");}
 }
 
