@@ -138,9 +138,9 @@
       }
 
       #lx-v15-google {
-        background: white;
-        color: #254934;
-        border: 1px solid #cbdad0;
+        background: #078b50;
+        color: #ffffff;
+        border: 1px solid #078b50;
       }
 
       #lx-v15-email {
