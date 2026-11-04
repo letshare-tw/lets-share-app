@@ -123,7 +123,33 @@ window.lxSaveRealProfile=async()=>{
 function refreshMemberView(){if(typeof page!=='undefined'&&page==='me'&&typeof render==='function')render();}
 window.__lxRealAuth={user:null};
 window.lxOpenRealLogin=()=>show(true);
-window.lxGoogleLogin=()=>{$('lx-auth-google').click();};
+window.lxGoogleLogin=()=>{
+  try {
+    const {url}=config();
+    const origins=[
+      'https://lets-share.com.tw',
+      'https://www.lets-share.com.tw'
+    ];
+    const paths=[
+      '/app/','/app/index.html',
+      '/mod-preview/','/mod-preview/index.html'
+    ];
+    if(!origins.includes(location.origin) ||
+       !paths.includes(location.pathname)){
+      throw Error('請使用樂享家正式 HTTPS 網址登入');
+    }
+    const target=new URL(url+'/auth/v1/authorize');
+    target.searchParams.set('provider','google');
+    target.searchParams.set(
+      'redirect_to',
+      'https://lets-share.com.tw/mod-preview/'
+    );
+    location.assign(target.toString());
+  } catch(e) {
+    show(true);
+    say('❌ '+e.message);
+  }
+};
 window.lxOpenConnectionTest=()=>{document.getElementById("lx-connect-panel").style.display="block";};
 window.lxMemberBanner=()=>{const u=window.__lxRealAuth.user;return `<section class="card" style="border:1px solid #c8dfd1;padding:15px;margin-bottom:12px"><b>💚 我的樂享家帳號</b><p class="muted" style="font-size:13px">${u?'已使用 Google／會員帳號登入：'+escapeHTML(u.email||'會員'):'登入後即可管理姓名、手機號碼與會員資料。'}</p><button type="button" onclick="lxOpenRealLogin()">${u?'帳號管理／登出':'登入／註冊'}</button>${u?'<p style="font-size:12px;color:#8b671d;margin-top:10px">手機驗證：請在會員基本資料下方查看 Supabase 驗證狀態</p>':''}<p style="font-size:12px;color:#667">提醒：訂單、錢包等部分功能仍為試營運示範資料。</p></section>`};
 function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
