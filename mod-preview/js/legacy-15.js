@@ -158,7 +158,7 @@ window.lxGoogleLogin=()=>{
   }
 };
 window.lxOpenConnectionTest=()=>{document.getElementById("lx-connect-panel").style.display="block";};
-window.lxMemberBanner=()=>{const u=window.__lxRealAuth.user;return `<section class="card" style="border:1px solid #c8dfd1;padding:15px;margin-bottom:12px"><b>💚 我的樂享家帳號</b><p class="muted" style="font-size:13px">${u?'已使用 Google／會員帳號登入：'+escapeHTML(u.email||'會員'):'登入後即可管理姓名、手機號碼與會員資料。'}</p><button type="button" onclick="lxOpenRealLogin()">${u?'帳號管理／登出':'登入／註冊'}</button>${u?'<p style="font-size:12px;color:#8b671d;margin-top:10px">手機驗證：請在會員基本資料下方查看 Supabase 驗證狀態</p>':''}<p style="font-size:12px;color:#667">提醒：訂單、錢包等部分功能仍為試營運示範資料。</p></section>`};
+window.lxMemberBanner=()=>{const u=window.__lxRealAuth.user;return `<section class="card" style="border:1px solid #c8dfd1;padding:15px;margin-bottom:12px"><b>💚 我的樂享家帳號</b><p class="muted" style="font-size:13px">${u?'已使用 Google／會員帳號登入：'+escapeHTML(u.email||'會員'):'登入後即可管理姓名、手機號碼與會員資料。'}</p>${u?'<button type="button" onclick="lxOpenRealLogin()">帳號管理</button> <button type="button" onclick="lxMemberSignOut()">登出</button>':'<button type="button" onclick="lxOpenRealLogin()">登入／註冊</button>'}${u?'<p style="font-size:12px;color:#8b671d;margin-top:10px">手機驗證：請在會員基本資料下方查看 Supabase 驗證狀態</p>':''}<p style="font-size:12px;color:#667">提醒：訂單、錢包等部分功能仍為試營運示範資料。</p></section>`};
 function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function refreshMember(){refreshMemberView();loadRealProfile();}
 function say(s){out.textContent=s;}
@@ -248,11 +248,30 @@ $('lx-auth-check').addEventListener('click',()=>run(async()=>{
  if(!user.id)throw Error('無法取得會員身分');window.__lxRealAuth.user={id:user.id,email:user.email||'',user_metadata:user.user_metadata||{},phone:user.phone||null,phone_confirmed_at:user.phone_confirmed_at||null};refreshMember();
  say('✅ 身分驗證成功！\n會員 ID：'+user.id+'\nEmail：'+(user.email||'(未提供)')+'\n\n這是 Supabase Auth 真實會員資料，非本地模擬資料。');
 }));
-$('lx-auth-signout').addEventListener('click',()=>run(async()=>{
- if(!token){clearSession();say('目前沒有登入狀態。');return;}
- const oldToken=token,url=sessionUrl,key=sessionKey;
- clearSession();sessionUrl=null;sessionKey=null;$('lx-auth-password').value='';
- try{await request(url,key,'logout',{},oldToken);say('✅ 已向 Supabase 發出登出請求，並清除本頁登入憑證。');}
- catch(e){say('⚠️ 本頁憑證已清除，但伺服器登出未確認：'+e.message);}
-}));
+/* AUTH-UI-005: one logout flow for both interfaces */
+window.lxMemberSignOut=()=>run(async()=>{
+  if(!token){
+    clearSession();
+    show(false);
+    if(typeof go==='function')go('home');
+    say('目前沒有登入狀態。');
+    return;
+  }
+  const oldToken=token,url=sessionUrl,key=sessionKey;
+  clearSession();
+  sessionUrl=null;
+  sessionKey=null;
+  $('lx-auth-password').value='';
+  show(false);
+  if(typeof go==='function')go('home');
+  try{
+    await request(url,key,'logout',{},oldToken);
+    say('✅ 已登出並清除本頁登入憑證。');
+  }catch(e){
+    say('⚠️ 本頁憑證已清除，但伺服器登出未確認：'+e.message);
+  }
+});
+$('lx-auth-signout').addEventListener(
+  'click',window.lxMemberSignOut
+);
 })();
