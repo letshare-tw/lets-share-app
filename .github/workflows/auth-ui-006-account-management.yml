@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Connect account management to profile
+      - name: Fix account management entry
         shell: bash
         run: |
           python3 - <<'PY'
@@ -22,15 +22,15 @@ jobs:
           p=Path("mod-preview/js/legacy-15.js")
           s=p.read_text(encoding="utf-8")
 
-          old='''onclick="lxOpenRealLogin()">帳號管理'''
-          new='''onclick="window.lxOpenMemberPanel('profile')">帳號管理'''
+          old='onclick="lxOpenRealLogin()">帳號管理'
+          new='onclick="window.lxOpenMemberPanel(&quot;profile&quot;)">帳號管理'
 
           if new in s:
               print("Already installed")
               raise SystemExit(0)
 
           if s.count(old)!=1:
-              raise SystemExit("Account management button not found")
+              raise SystemExit("Account management entry not found")
 
           s=s.replace(old,new,1)
           p.write_text(s,encoding="utf-8")
@@ -45,7 +45,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           s=Path("mod-preview/js/legacy-15.js").read_text()
-          assert """onclick="window.lxOpenMemberPanel('profile')">帳號管理""" in s
+          assert 'lxOpenMemberPanel(&quot;profile&quot;)' in s
           assert 'onclick="lxMemberSignOut()">登出' in s
           print("AUTH-UI-006 verified")
           PY
@@ -57,6 +57,6 @@ jobs:
           git add mod-preview/js/legacy-15.js
           git diff --cached --check
           if ! git diff --cached --quiet; then
-            git commit -m "AUTH-UI-006 account management entry"
+            git commit -m "AUTH-UI-006 fix account management"
             git push
           fi
