@@ -3,6 +3,7 @@ const key='lexiangjia-demo-v02';const products=[{id:1,name:'簡約輕量風衣�
 /* AUTH-UI-004 */
 const lxPageKey="lx_member_page_v1";
 const lxMemberPages=[
+  "home","categories","cart",
   "me","orders","myshares","wallet","favorites"
 ];
 function lxRememberPage(p){
