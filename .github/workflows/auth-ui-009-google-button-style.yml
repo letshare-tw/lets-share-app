@@ -1,0 +1,93 @@
+
+name: AUTH-UI-009 Google Button Style
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply green Google login buttons
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          gate=Path("mod-preview/lx-test-gate.js")
+          app=Path("mod-preview/js/legacy-01.js")
+          auth=Path("mod-preview/js/legacy-15.js")
+
+          g=gate.read_text(encoding="utf-8")
+          a=app.read_text(encoding="utf-8")
+          u=auth.read_text(encoding="utf-8")
+
+          old_css="background: white;\n        color: #254934;\n        border: 1px solid #cbdad0;"
+          new_css="background: #078b50;\n        color: #ffffff;\n        border: 1px solid #078b50;"
+
+          old_inline="background:#fff;color:#17653e;border:1px solid #dbe8e0;"
+          new_inline="background:#078b50;color:#fff;border:1px solid #078b50;"
+
+          old_member='onclick="lxGoogleLogin()">使用 Google 帳號登入／註冊'
+          new_member='onclick="lxGoogleLogin()" style="background:#078b50;color:#fff;border:1px solid #078b50">使用 Google 帳號登入／註冊'
+
+          changes=[
+              (g,old_css,new_css,"Gate CSS"),
+              (a,old_inline,new_inline,"Splash button"),
+              (u,old_member,new_member,"Member button")
+          ]
+
+          for source,old,new,label in changes:
+              if source.count(old)!=1 and new not in source:
+                  raise SystemExit(label+" not found uniquely")
+
+          if old_css in g:
+              g=g.replace(old_css,new_css,1)
+          if old_inline in a:
+              a=a.replace(old_inline,new_inline,1)
+          if old_member in u:
+              u=u.replace(old_member,new_member,1)
+
+          gate.write_text(g,encoding="utf-8")
+          app.write_text(a,encoding="utf-8")
+          auth.write_text(u,encoding="utf-8")
+
+          print("AUTH-UI-009 installed")
+          PY
+
+      - name: Check JavaScript
+        run: |
+          node --check mod-preview/lx-test-gate.js
+          node --check mod-preview/js/legacy-01.js
+          node --check mod-preview/js/legacy-15.js
+
+      - name: Verify
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          g=Path("mod-preview/lx-test-gate.js").read_text()
+          a=Path("mod-preview/js/legacy-01.js").read_text()
+          u=Path("mod-preview/js/legacy-15.js").read_text()
+          assert "background: #078b50;" in g
+          assert "background:#078b50;color:#fff;" in a
+          assert 'onclick="lxGoogleLogin()" style="background:#078b50;' in u
+          assert "lx_can_access_test_app" in g
+          print("Verified")
+          PY
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mod-preview/lx-test-gate.js mod-preview/js/legacy-01.js mod-preview/js/legacy-15.js
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m "AUTH-UI-009 green Google buttons"
+            git push
+          fi
