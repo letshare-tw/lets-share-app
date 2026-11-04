@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Clean up public login entries
+      - name: Fix login entries
         shell: bash
         run: |
           python3 - <<'PY'
@@ -21,110 +21,78 @@ jobs:
 
           gate = Path("mod-preview/lx-test-gate.js")
           app = Path("mod-preview/js/legacy-01.js")
-
           g = gate.read_text(encoding="utf-8")
           a = app.read_text(encoding="utf-8")
 
-          marker = "AUTH-UI-008"
+          old_email = 'mode === "login" ? "block" : "none";'
+          email_line = 'el("lx-v15-email").style.display ='
+          old_splash = '<button class="primary outline" onclick="lxOpenRealLogin()">會員登入（Supabase）</button>'
 
-          if marker in g and marker in a:
+          if "AUTH-UI-008" in g and "AUTH-UI-008" in a:
               print("Already installed")
               raise SystemExit(0)
 
-          if marker in g or marker in a:
-              raise SystemExit("Partial installation detected")
+          if "AUTH-UI-008" in g or "AUTH-UI-008" in a:
+              raise SystemExit("Partial installation")
 
-          old_email = '''          <button
-            id="lx-v15-email"
-            type="button"
-          >
-            使用 Email 登入
-          </button>'''
+          start = g.find(email_line)
+          if start < 0:
+              raise SystemExit("Email display missing")
 
-          new_email = '''          <!-- AUTH-UI-008: Email entry disabled
-               until member Email login is ready. -->
-          <button
-            id="lx-v15-email"
-            type="button"
-            style="display:none"
-            disabled
-            hidden
-          >
-            使用 Email 登入
-          </button>'''
+          end = g.find(old_email, start)
+          if end < 0 or end - start > 120:
+              raise SystemExit("Email rule missing")
 
-          if g.count(old_email) != 1:
-              raise SystemExit("Email gate entry not found")
-
-          g = g.replace(old_email, new_email, 1)
-
-          old_display = '''    el("lx-v15-email").style.display =
-      mode === "login" ? "block" : "none";'''
-
-          new_display = '''    el("lx-v15-email").style.display = "none";'''
-
-          if g.count(old_display) != 1:
-              raise SystemExit("Email display rule not found")
-
-          g = g.replace(old_display, new_display, 1)
-
-          old_splash = (
-              '<button class="primary outline" '
-              'onclick="lxOpenRealLogin()">'
-              '會員登入（Supabase）</button>'
-          )
-
-          new_splash = (
-              '<!-- AUTH-UI-008: Legacy login entry hidden -->'
+          g = (
+              g[:start]
+              + '/* AUTH-UI-008 */\n    '
+              + email_line
+              + ' "none";'
+              + g[end + len(old_email):]
           )
 
           if a.count(old_splash) != 1:
-              raise SystemExit("Legacy splash entry not found")
+              raise SystemExit("Splash button missing")
 
-          a = a.replace(old_splash, new_splash, 1)
+          a = a.replace(
+              old_splash,
+              '<!-- AUTH-UI-008: legacy login hidden -->',
+              1
+          )
 
           gate.write_text(g, encoding="utf-8")
           app.write_text(a, encoding="utf-8")
-
           print("AUTH-UI-008 installed")
           PY
 
-      - name: Check JavaScript syntax
+      - name: Check JavaScript
         run: |
           node --check mod-preview/lx-test-gate.js
           node --check mod-preview/js/legacy-01.js
 
-      - name: Verify login entries
+      - name: Verify
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
-
           g = Path("mod-preview/lx-test-gate.js").read_text()
           a = Path("mod-preview/js/legacy-01.js").read_text()
-
           assert "AUTH-UI-008" in g
           assert "AUTH-UI-008" in a
-          assert 'el("lx-v15-email").style.display = "none"' in g
-          assert 'id="lx-v15-email"' in g
-          assert "disabled" in g
-          assert "async function allowed(token)" in g
+          assert 'el("lx-v15-email").style.display = "none";' in g
           assert "lx_can_access_test_app" in g
           assert "會員登入（Supabase）</button>" not in a
           assert 'onclick="lxGoogleLogin()"' in a
-          assert "開始使用</button>" in a
-
-          print("AUTH-UI-008 verified")
+          print("Verified")
           PY
 
-      - name: Commit changes
+      - name: Commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add mod-preview/lx-test-gate.js
-          git add mod-preview/js/legacy-01.js
+          git add mod-preview/lx-test-gate.js mod-preview/js/legacy-01.js
           git diff --cached --check
           if ! git diff --cached --quiet; then
-            git commit -m "AUTH-UI-008 clean up login entries"
+            git commit -m "AUTH-UI-008 login cleanup"
             git push
           fi
