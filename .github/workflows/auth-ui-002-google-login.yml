@@ -1,0 +1,79 @@
+
+name: AUTH-UI-002 Fix Google Login
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fix Google login entry
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("mod-preview/js/legacy-15.js")
+          s = p.read_text(encoding="utf-8")
+
+          old = "window.lxGoogleLogin=()=>{$('lx-auth-google').click();};"
+
+          new = """window.lxGoogleLogin=()=>{
+            try {
+              const {url}=config();
+              const origins=[
+                'https://lets-share.com.tw',
+                'https://www.lets-share.com.tw'
+              ];
+              const paths=[
+                '/app/','/app/index.html',
+                '/mod-preview/','/mod-preview/index.html'
+              ];
+              if(!origins.includes(location.origin) ||
+                 !paths.includes(location.pathname)){
+                throw Error('請使用樂享家正式 HTTPS 網址登入');
+              }
+              const target=new URL(url+'/auth/v1/authorize');
+              target.searchParams.set('provider','google');
+              target.searchParams.set(
+                'redirect_to',
+                'https://lets-share.com.tw/mod-preview/'
+              );
+              location.assign(target.toString());
+            } catch(e) {
+              show(true);
+              say('❌ '+e.message);
+            }
+          };"""
+
+          if old not in s:
+              if new in s:
+                  print("Already installed")
+                  raise SystemExit(0)
+              raise SystemExit("Original Google login entry not found")
+
+          if s.count(old) != 1:
+              raise SystemExit("Unexpected duplicate login entry")
+
+          p.write_text(s.replace(old,new,1),encoding="utf-8")
+          print("Google OAuth entry repaired")
+          PY
+
+      - name: Check JavaScript syntax
+        run: node --check mod-preview/js/legacy-15.js
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mod-preview/js/legacy-15.js
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m "AUTH-UI-002 fix Google login entry"
+            git push
+          fi
