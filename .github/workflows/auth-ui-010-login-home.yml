@@ -1,0 +1,79 @@
+
+name: AUTH-UI-010 Login To Home
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Redirect Google login to home
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          app = Path("mod-preview/js/legacy-15.js")
+          index = Path("mod-preview/index.html")
+
+          s = app.read_text(encoding="utf-8")
+          h = index.read_text(encoding="utf-8")
+
+          old = "if(typeof go==='function')go('me');"
+          new = "if(typeof go==='function')go('home');"
+
+          if old in s:
+              if s.count(old) != 1:
+                  raise SystemExit("Redirect not unique")
+              s = s.replace(old, new, 1)
+          elif new not in s:
+              raise SystemExit("Redirect not found")
+
+          old_script = './js/legacy-15.js'
+          new_script = './js/legacy-15.js?v=auth-ui-010'
+
+          if new_script not in h:
+              if h.count(old_script) != 1:
+                  raise SystemExit("Script reference not unique")
+              h = h.replace(old_script, new_script, 1)
+
+          app.write_text(s, encoding="utf-8")
+          index.write_text(h, encoding="utf-8")
+
+          print("AUTH-UI-010 installed")
+          PY
+
+      - name: Verify
+        shell: bash
+        run: |
+          node --check mod-preview/js/legacy-15.js
+          python3 - <<'PY'
+          from pathlib import Path
+
+          s = Path("mod-preview/js/legacy-15.js").read_text()
+          h = Path("mod-preview/index.html").read_text()
+
+          assert "if(typeof go==='function')go('home');" in s
+          assert "if(typeof go==='function')go('me');" not in s
+          assert "lxRestorePage(user.id)" in s
+          assert "legacy-15.js?v=auth-ui-010" in h
+
+          print("Verification passed")
+          PY
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mod-preview/js/legacy-15.js mod-preview/index.html
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m "AUTH-UI-010 Google login to home"
+            git push
+          fi
