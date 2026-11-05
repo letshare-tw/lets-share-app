@@ -226,7 +226,7 @@ async function handleOAuthReturn(){
   window.__lxRealAuth.user={id:user.id,email:user.email||'',user_metadata:user.user_metadata||{},phone:user.phone||null,phone_confirmed_at:user.phone_confirmed_at||null};refreshMember();
   say('✅ Google 登入成功，Supabase 已確認會員身分！\nEmail：'+(user.email||'(未提供)')+'\n會員 ID：'+user.id+'\n\n此版本僅測試會員身分；其他資料仍為示範。');
   show(false);
-  if(typeof go==='function')go('me');
+  if(typeof go==='function')go('home');
  }catch(e){clearSession();show(true);say('❌ Google 回跳驗證失敗：'+e.message);}
 }
 handleOAuthReturn();
