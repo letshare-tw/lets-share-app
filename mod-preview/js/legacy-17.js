@@ -1,49 +1,27 @@
-
+/* LEGAL-DEV-001C: test-only registration. */
 (function(){
- const esc=(v)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
- window.lxOnboardCard=function(){
-  const u=window.__lxRealAuth?.user;
-  if(!u)return '';
-  const p=window.__lxProfile||{};
-  const own=p.id===u.id;
-  const nickname=!!(own&&String(p.display_name||'').trim());
-  const fullname=!!(own&&String(p.full_name||'').trim());
-  const authPhone=String(u.phone||'').replace(/^\+/, '');
-  const profilePhone=String(p.phone||'').replace(/\D/g,'');
-  const phoneMatch=own&&profilePhone&&authPhone===('886'+profilePhone.slice(1));
-  const confirmed=!!(phoneMatch&&u.phone_confirmed_at);
-  const isTest=authPhone==='886900000001';
-  const verified=confirmed&&!isTest;
-  const row=(n,title,done,sub,target)=>`<div style="display:flex;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid #e6eee8"><div style="width:30px;height:30px;border-radius:50%;background:${done?'#dff4e8':'#eef2ef'};display:grid;place-items:center;flex-shrink:0">${done?'✓':n}</div><div style="flex:1;min-width:0"><b style="font-size:14px">${title}</b><div style="font-size:12px;color:#66776d;margin-top:3px">${sub}</div></div>${target?`<button type="button" onclick="lxOnboardJump('${target}')" style="width:auto;padding:8px 11px;border:1px solid #278a5b;border-radius:18px;background:white;color:#187349;font-size:12px">前往</button>`:''}</div>`;
-  return `<section class="card" style="padding:16px;margin:12px 0;border:1px solid #afd7bf;background:#f8fcf9"><b>🧭 一般會員註冊｜V0.6.6q</b><p class="muted" style="font-size:12px;line-height:1.8">一般買家也必須完成手機 OTP。先完成簡易會員註冊；分享衣物、職人與騎手的額外資格，等需要時才申請。以下僅供開發測試，不代表正式註冊完成。</p>
-  ${row(1,'建立會員帳號',true,'已使用 Google 登入同一個 Supabase 帳號','')}
-  ${row(2,'填寫基本資料',nickname&&fullname,nickname&&fullname?'暱稱及姓名已填寫（不代表實名驗證）':'請填寫暱稱及姓名','profile')}
-  ${row(3,'手機 OTP 驗證（所有會員必須）',verified,confirmed&&isTest?'固定測試號碼已確認，但不能作為正式會員驗證':verified?'非固定測試號碼有確認紀錄，仍須正式後端審核':'尚未取得符合正式資格的手機確認紀錄','otp')}
-  ${row(4,'會員條款與個資告知分別確認',false,'正式文件尚未發布；目前草案勾選不構成正式同意','consent')}
-  <div style="margin-top:14px;padding:12px;border-radius:12px;background:#eef5f0;font-size:12px;line-height:1.9"><b>🔐 正式註冊狀態：尚未開放</b><br>上述必要條件須由可信任後端核定，並記錄兩份正式文件的個別版本及同意時間；前端不會自行標記完成。</div>
-  <div style="margin-top:14px;padding:12px;border:1px solid #d7e5db;border-radius:12px;font-size:12px;line-height:1.9"><b>🌱 其他身分，依需求再開通</b><br>📦 分享衣物：首次分享時確認衣物交付、不退回、轉贈回收授權及售出回饋規則。<br>🧵 樂享職人：提出工作資格申請，完成必要審核與合作契約。<br>🛵 樂享騎手：提出配送資格申請，完成駕照、車輛、必要授權及合作審核。<br><span style="color:#697b70">本區為流程說明，不會直接核發任何角色權限。</span></div>
-  <p style="font-size:12px;color:#8b6427;margin-top:14px">⚠️ 目前 Supabase 固定測試手機不能通過正式註冊；正式條款、個資告知與後端核定功能尚未啟用。</p></section>`;
- };
-
- window.lxOnboardJump=function(target){
-   const ids={
-     profile:'lx-profile-save',
-     otp:'lx-otp-send',
-     consent:'lx-consent-terms-status'
-   };
-   const id=ids[target];
-   const anchor=id
-     ?document.getElementById(id)
-     :null;
-   if(!anchor){
-     alert('此區塊尚未載入，請稍候再試。');
-     return;
-   }
-   const card=
-     anchor.closest('section.card')||anchor;
-   card.scrollIntoView({
-     behavior:'smooth',
-     block:'center'
-   });
- };
+'use strict';
+const URL='https://wxvauoeykusmbxdtwgxo.supabase.co', KEY='sb_publishable_ZCqKEuqpTiZ46p9fx_JXvA_av4JwD3I';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let docs=[],owner=null,busy=false,done=null;
+const uid=()=>window.__lxRealAuth?.user?.id||null;
+function say(s){const el=document.getElementById('lx-dev-result');if(el)el.textContent=s;}
+function redraw(){if(typeof page!=='undefined'&&page==='me'&&typeof render==='function')render();}
+async function rpc(name,body){
+ const id=uid();let session;try{session=JSON.parse(sessionStorage.getItem('lx_supabase_auth_v066g')||'null')}catch{}
+ if(!id||!session?.token)throw Error('請先登入 Google 會員');
+ const headers={apikey:KEY,Authorization:'Bearer '+session.token};
+ const a=await fetch(URL+'/auth/v1/user',{headers,cache:'no-store'}),u=await a.json().catch(()=>({}));
+ if(!a.ok||u.id!==id)throw Error('登入憑證失效或會員不一致，請重新登入');
+ const r=await fetch(URL+'/rest/v1/rpc/'+name,{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify(body),cache:'no-store'});
+ const d=await r.json().catch(()=>null);
+ if(!r.ok)throw Error(d?.message||'後端拒絕操作（HTTP '+r.status+'）');
+ if(uid()!==id)throw Error('帳號已切換，請重新登入');return d;
+}
+function documentCard(d){return `<div style="padding:12px;border:1px solid #d2e3d8;border-radius:12px;margin:10px 0"><b>${esc(d.title)}</b><div class="muted">版本 ${esc(d.version)}｜僅供開發測試</div><details style="margin:9px 0"><summary>展開閱讀完整草案</summary><div style="white-space:pre-wrap;line-height:1.75;font-size:13px;margin-top:8px">${esc(d.content)}</div></details><label style="display:flex;gap:9px;align-items:flex-start;font-size:13px"><input type="checkbox" id="lx-dev-${esc(d.document_code)}" style="width:auto;flex:none;margin-top:4px"><span>我已閱讀並確認此份測試草案（非正式法律同意）</span></label></div>`;}
+window.lxDevRegistrationCard=function(){if(!uid())return '';const ready=owner===uid()&&docs.length===2;return `<section class="card" style="padding:16px;margin:12px 0;border:1px solid #80b99a"><b>🌱 測試會員註冊｜LEGAL-DEV-001C</b><p class="muted" style="font-size:12px">僅核准測試帳號使用；不等於正式法律同意、真實手機驗證或職人／騎手資格。</p>${done===uid()?'<p>✅ 後端已確認測試註冊完成。可前往「我的分享衣物」建立草稿。</p>':ready?docs.map(documentCard).join('')+'<button type="button" id="lx-dev-submit" onclick="lxDevRegisterSubmit()">確認兩份草案並完成測試註冊</button>':'<button type="button" onclick="lxDevLoadDocuments()">讀取 Supabase 測試文件</button>'}<p id="lx-dev-result" role="status" aria-live="polite" style="font-size:13px">${ready?'請分別閱讀並勾選兩份文件。':'文件僅供符合資格的測試帳號讀取。'}</p></section>`;};
+window.lxDevLoadDocuments=async function(){if(busy)return;busy=true;docs=[];owner=null;say('讀取中…');try{const id=uid(),data=await rpc('lx_get_dev_registration_documents',{});if(!Array.isArray(data)||data.length!==2||!['member_terms','privacy_notice'].every(k=>data.some(d=>d.document_code===k&&d.version&&d.content)))throw Error('文件不完整，暫停註冊');owner=id;docs=data;redraw();}catch(e){say('無法讀取：'+e.message)}finally{busy=false}};
+window.lxDevRegisterSubmit=async function(){if(busy||owner!==uid()||docs.length!==2)return;if(!['member_terms','privacy_notice'].every(k=>document.getElementById('lx-dev-'+k)?.checked)){say('請分別勾選兩份文件。');return;}busy=true;const btn=document.getElementById('lx-dev-submit');if(btn)btn.disabled=true;say('後端處理中…');try{const id=uid(),t=docs.find(d=>d.document_code==='member_terms'),p=docs.find(d=>d.document_code==='privacy_notice');const result=await rpc('lx_complete_dev_registration',{p_member_terms_version:t.version,p_privacy_notice_version:p.version,p_member_terms_agreed:true,p_privacy_notice_acknowledged:true});if(result!==true)throw Error('後端未確認完成');done=id;docs=[];owner=null;redraw();}catch(e){say('註冊未完成：'+e.message)}finally{busy=false;if(btn)btn.disabled=false}};
+window.lxOnboardCard=function(){const u=window.__lxRealAuth?.user;if(!u)return '';const p=window.__lxProfile||{},ok=p.id===u.id&&!!String(p.display_name||'').trim()&&!!String(p.full_name||'').trim();return `<section class="card" style="padding:16px;margin:12px 0;border:1px solid #afd7bf;background:#f8fcf9"><b>🧭 一般會員註冊｜測試流程</b><p class="muted">正式會員註冊尚未開放。測試帳號可使用下方受控註冊。</p><p>✅ Google 帳號已登入</p><p>${ok?'✅':'⬜'} 會員基本資料（暱稱、姓名）</p><p>⬜ 正式手機 OTP（測試例外不等於真實驗證）</p><p>⬜ 正式法律文件（尚未發布）</p><p class="muted">分享者、職人、騎手須另行申請資格。</p></section>`+window.lxDevRegistrationCard();};
+window.lxOnboardJump=function(target){const ids={profile:'lx-profile-save',otp:'lx-otp-send',consent:'lx-dev-result'};const e=document.getElementById(ids[target]);if(e)(e.closest('section.card')||e).scrollIntoView({behavior:'smooth',block:'center'});else alert('此區塊尚未載入');};
 })();
