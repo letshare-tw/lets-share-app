@@ -86,6 +86,7 @@ window.lxC09LoadPlacementDefault=async function(id,stamp){
 };
 window.lxC09RestoreDraft=async function(){
  const stamp=++generation;
+ if(window.lxC09SkipNextRestore){window.lxC09SkipNextRestore=false;return}
  try{
   const {id}=credentials();
   const rows=await request('/rest/v1/lx_share_draft_details?select=request_id,clothing_count,pickup_kind,pickup_address_snapshot,collection_point_id,placement_note,placement_photo_path&user_id=eq.'+encodeURIComponent(id)+'&order=updated_at.desc&limit=1');
