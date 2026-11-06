@@ -26,7 +26,15 @@ window.lxC09UpdateSwipeLock=function(){
  if(!ready){
   knob.style.left='5px';knob.setAttribute('aria-valuenow','0');
   if(label)label.textContent='請先完成流程並儲存草稿';
-  if(message)message.textContent='須完成衣物件數、取件地點、放置位置拍照，並成功儲存草稿，才能滑動。';
+  if(message){
+   const count=Number(document.getElementById('count')?.value);
+   const kind=document.getElementById('lx-pickup-kind')?.value;
+   const location=kind==='home'?document.getElementById('lx-pickup-address')?.dataset.address:document.getElementById('lx-approved-points')?.value;
+   const photo=window.lxC09PlacementPhoto?.();
+   const saved=document.getElementById('lx-c09-draft-status')?.dataset.saved==='1';
+   const missing=[!(Number.isInteger(count)&&count>=2&&count<=1000)?'衣物件數':null,!location?'取件地點':null,!photo?'放置位置照片':null,!saved?'儲存草稿':null].filter(Boolean);
+   message.textContent='尚需完成：'+missing.join('、')+'。';
+  }
  }else{
   if(label)label.textContent='向右滑動確認分享　››';
   if(message)message.textContent='資料已儲存；滑動僅為介面測試，不會正式送出或派單。';
