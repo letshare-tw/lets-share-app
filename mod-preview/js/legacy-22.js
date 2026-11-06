@@ -68,9 +68,21 @@ window.lxC09SaveDraft=async function(){
   }
   const payload={request_id:requestId,user_id:id,clothing_count:count,pickup_kind:kind,pickup_address_snapshot:kind==='home'?address():document.getElementById('lx-approved-points')?.selectedOptions?.[0]?.textContent||null,collection_point_id:point||null,placement_note:note||null,placement_photo_path:photoPath,updated_at:new Date().toISOString()};
   await request('/rest/v1/lx_share_draft_details?on_conflict=request_id',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(payload)});
+  // Remember the last successfully saved placement note for future sharing.
+  try{
+   await request('/rest/v1/profiles?id=eq.'+encodeURIComponent(id),{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({home_placement_note:note||null})});
+  }catch(err){console.warn('C09 placement default was not updated:',err)}
   status('✓ 草稿已儲存至 Supabase'+(photoPath?'（含照片）':'（尚未拍照）')+'。未正式提交，也不會派單。');
  }catch(e){status('儲存失敗：'+(e.message||String(e)),true)}
  finally{if(btn)btn.disabled=false}
+};
+window.lxC09LoadPlacementDefault=async function(id,stamp){
+ try{
+  const rows=await request('/rest/v1/profiles?select=home_placement_note&id=eq.'+encodeURIComponent(id)+'&limit=1');
+  if(stamp!==generation)return;
+  const field=document.getElementById('lx-placement-note');
+  if(field&&!field.value.trim()&&rows?.[0]?.home_placement_note)field.value=rows[0].home_placement_note;
+ }catch(err){console.warn('C09 placement default unavailable:',err)}
 };
 window.lxC09RestoreDraft=async function(){
  const stamp=++generation;
@@ -78,12 +90,16 @@ window.lxC09RestoreDraft=async function(){
   const {id}=credentials();
   const rows=await request('/rest/v1/lx_share_draft_details?select=request_id,clothing_count,pickup_kind,pickup_address_snapshot,collection_point_id,placement_note,placement_photo_path&user_id=eq.'+encodeURIComponent(id)+'&order=updated_at.desc&limit=1');
   if(stamp!==generation||!document.getElementById('lx-c09-save-draft'))return;
-  if(!rows?.length){status('尚無已儲存的詳細草稿。可先填寫資料再儲存。');return}
+  if(!rows?.length){
+   await window.lxC09LoadPlacementDefault?.(id,stamp);
+   status('尚無已儲存的詳細草稿。可先填寫資料再儲存。');return
+  }
   const d=rows[0];
   const count=document.getElementById('count'),kind=document.getElementById('lx-pickup-kind'),note=document.getElementById('lx-placement-note'),points=document.getElementById('lx-approved-points');
   if(count)count.value=d.clothing_count;
   if(kind)kind.value=d.pickup_kind==='collection_point'?'point':'home';
   if(note)note.value=d.placement_note||'';
+  if(note&&!d.placement_note)await window.lxC09LoadPlacementDefault?.(id,stamp);
   if(points&&d.collection_point_id)points.value=d.collection_point_id;
   window.lxC09ChangePickup?.();
   if(d.placement_photo_path){try{await loadPhoto(d.placement_photo_path)}catch(e){status('草稿資料已讀取，但'+e.message,true);return}}
