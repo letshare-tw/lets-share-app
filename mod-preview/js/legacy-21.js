@@ -109,6 +109,16 @@
   const retry=document.createElement('button');retry.type='button';retry.textContent='↻ 重新拍攝';retry.style.cssText='padding:8px 14px;border-radius:999px;border:1px solid #078b58;background:white;color:#078b58;font-weight:700;font-size:14px';retry.onclick=window.lxC09OpenCamera;info.appendChild(retry);
   card.appendChild(info);out.appendChild(card);
   const note=document.createElement('p');note.textContent='僅本機預覽，尚未上傳至 Supabase。';out.appendChild(note);
+  // After capture, move the viewport to the next action instead of the top of a tall photo.
+  const scrollToNext=()=>{
+   if(!out.isConnected)return;
+   const target=document.getElementById('lx-c09-swipe-track')||document.getElementById('lx-c09-save-draft');
+   if(!target)return;
+   const rect=target.getBoundingClientRect();
+   const top=window.scrollY+rect.top-Math.max(140,window.innerHeight*.36);
+   window.scrollTo({top:Math.max(0,top),behavior:'smooth'});
+  };
+  requestAnimationFrame(()=>requestAnimationFrame(scrollToNext));
  };
  window.lxC09PreviewPhotos=function(input){const files=[...(input.files||[])];if(files.length!==1){document.getElementById('lx-photo-preview').textContent='請選擇 1 張照片';return}window.lxC09RenderPhoto(files[0])};
 })();
