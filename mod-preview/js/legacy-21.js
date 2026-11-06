@@ -5,6 +5,15 @@
  const URL='https://wxvauoeykusmbxdtwgxo.supabase.co';
  const KEY='sb_publishable_ZCqKEuqpTiZ46p9fx_JXvA_av4JwD3I';
  const SESSION_KEY='lx_supabase_auth_v066g';
+ const originalHome=window.home;
+ if(typeof originalHome==='function'){
+  window.home=function(){
+   return originalHome().replace(
+    '<button class="secondary wide" onclick="go(\'share\')">我要分享衣物</button>',
+    '<button class="primary wide" onclick="go(\'share\')" style="background:#078b58;color:#fff;border:0;border-radius:999px;font-weight:800">我要分享衣物 &gt;</button>'
+   );
+  };
+ }
  const original=window.share;
  if(typeof original!=='function')return;
  const escapeHtml=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&quot;'}[c]));
@@ -23,6 +32,10 @@
    // Remove any remaining legacy consent checkbox block if the HTML attribute order changes.
    html=html.replace(/<label\b[^>]*>[\s\S]{0,350}?<input\b[^>]*\bid="agree"[^>]*>[\s\S]{0,500}?<\/label>/i,'');
    html=html.replace('正式提交時至少 1 張，最多 3 張','正式提交時 1 張');
+   // Use one prominent camera button instead of the browser's default file picker.
+   html=html.replace(/<label>分享袋放置位置照片（正式提交時 1 張）<\/label><input id="lx-placement-photos"([^>]*)>/,
+    '<button type="button" class="primary wide" onclick="document.getElementById(\'lx-placement-photos\')?.click()" style="margin-top:14px;background:#078b58;color:white;border:0;border-radius:999px">📷 拍攝分享放置點</button><input id="lx-placement-photos"$1 style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none" aria-label="拍攝分享放置點">');
+
    html=html.replace('前往會員中心建立 Supabase 分享草稿','建立／取得 Supabase 草稿（地點及照片尚未送出）');
    setTimeout(window.lxC09LoadLocations,0);
    return html;
