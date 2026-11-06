@@ -21,7 +21,7 @@ async function request(path,options={}){
  if(!response.ok){let detail='';try{const j=await response.json();detail=j.message||j.error||''}catch{}throw Error((detail||'伺服器處理失敗')+'（HTTP '+response.status+'）')}
  if(response.status===204)return null;
  const type=response.headers.get('content-type')||'';
- return type.includes('json')?response.json():response.text();
+ const raw=await response.text();if(!raw)return null;return type.includes('json')?JSON.parse(raw):raw;
 }
 function status(message,error=false){const el=document.getElementById('lx-c09-draft-status');if(el){el.textContent=message;el.style.color=error?'#b42318':'#08784c'}}
 function address(){return document.getElementById('lx-pickup-address')?.dataset.address||''}
