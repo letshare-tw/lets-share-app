@@ -60,6 +60,15 @@
 
  let lxCameraStream=null,lxPhotoFile=null;
  window.lxC09PlacementPhoto=()=>lxPhotoFile;
+ window.lxC09ClearPhoto=function(){
+  lxPhotoFile=null;
+  const preview=document.getElementById('lx-photo-preview');
+  if(preview)preview.replaceChildren();
+  const button=document.getElementById('lx-placement-camera-button');
+  if(button)button.style.display='';
+  const input=document.getElementById('lx-placement-photos');
+  if(input)input.value='';
+ };
  window.lxC09CloseCamera=function(){if(lxCameraStream){lxCameraStream.getTracks().forEach(t=>t.stop());lxCameraStream=null}document.getElementById('lx-c09-camera-modal')?.remove()};
  window.lxC09OpenCamera=async function(){
   window.lxC09CloseCamera();
