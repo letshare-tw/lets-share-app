@@ -26,7 +26,7 @@
    html=html.replace(/<label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;line-height:1\.6"><input id="agree"[\s\S]*?<\/label>/,'<p class="muted" style="font-size:13px">分享服務條款於開通服務時確認；如條款有重大更新，須重新取得同意。正式分享功能尚未開放。</p>');
    html=html.replace('預約送件或聯絡樂享職人','放置分享袋並拍攝位置').replace('由系統安排後續物流（本版模擬）','照片供日後受派騎手辨識取件位置');
    html=html.replace(/<label>舊版模擬集貨點（目前不送出）<\/label><select id="point" class="field">[\s\S]*?<\/select>/,
-    '<label>取件地點</label><select id="lx-pickup-kind" class="field" onchange="lxC09ChangePickup()"><option value="home">會員住址（預設）</option><option value="point">核定集貨點</option></select><div id="lx-pickup-address" class="muted" aria-live="polite">正在讀取會員住址…</div><select id="lx-approved-points" class="field" style="display:none" aria-label="已核定集貨點"></select><label>分享袋放置位置說明</label><textarea id="lx-placement-note" class="field" maxlength="300" placeholder="例如：一樓大門右側指定置物架"></textarea><button id="lx-placement-camera-button" type="button" class="primary wide" onclick="document.getElementById(\'lx-placement-photos\')?.click()" style="margin-top:14px;background:#078b58;color:#fff;border:0;border-radius:999px">📷 拍攝分享放置點</button><input id="lx-placement-photos" type="file" accept="image/*" capture="environment" onchange="lxC09PreviewPhotos(this)" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none" aria-label="拍攝分享放置點"><div id="lx-photo-preview" class="muted">目前尚未選取照片。測試階段只在本機預覽，尚未上傳。</div>');
+    '<label>取件地點</label><select id="lx-pickup-kind" class="field" onchange="lxC09ChangePickup()"><option value="home">會員住址（預設）</option><option value="point">核定集貨點</option></select><div id="lx-pickup-address" class="muted" aria-live="polite">正在讀取會員住址…</div><select id="lx-approved-points" class="field" style="display:none" aria-label="已核定集貨點"></select><label>分享袋放置位置說明</label><textarea id="lx-placement-note" class="field" maxlength="300" placeholder="例如：一樓大門右側指定置物架"></textarea><button id="lx-placement-camera-button" type="button" class="primary wide" onclick="lxC09OpenCamera()" style="margin-top:14px;background:#078b58;color:#fff;border:0;border-radius:999px">📷 拍攝分享放置點</button><input id="lx-placement-photos" type="file" accept="image/*" capture="environment" onchange="lxC09PreviewPhotos(this)" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none" aria-label="拍攝分享放置點"><div id="lx-photo-preview" class="muted">目前尚未選取照片。測試階段只在本機預覽，尚未上傳。</div>');
    // Remove the legacy per-share consent checkbox regardless of the label's inline style.
    html=html.replace(/<label\b[^>]*>\s*<input\b[^>]*\bid="agree"[^>]*>[\s\S]*?<\/label>/i,'<p class="muted" style="font-size:13px">分享條款於開通服務時確認，正式提交時由後端驗證同意紀錄。</p>');
    // Remove any remaining legacy consent checkbox block if the HTML attribute order changes.
@@ -34,7 +34,7 @@
    html=html.replace('正式提交時至少 1 張，最多 3 張','正式提交時 1 張');
    // Use one prominent camera button instead of the browser's default file picker.
    html=html.replace(/<label>分享袋放置位置照片（正式提交時 1 張）<\/label><input id="lx-placement-photos"([^>]*)>/,
-    '<button id="lx-placement-camera-button" type="button" class="primary wide" onclick="document.getElementById(\'lx-placement-photos\')?.click()" style="margin-top:14px;background:#078b58;color:white;border:0;border-radius:999px">📷 拍攝分享放置點</button><input id="lx-placement-photos"$1 style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none" aria-label="拍攝分享放置點">');
+    '<button id="lx-placement-camera-button" type="button" class="primary wide" onclick="lxC09OpenCamera()" style="margin-top:14px;background:#078b58;color:white;border:0;border-radius:999px">📷 拍攝分享放置點</button><input id="lx-placement-photos"$1 style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none" aria-label="拍攝分享放置點">');
 
    html=html.replace('前往會員中心建立 Supabase 分享草稿','建立／取得 Supabase 草稿（地點及照片尚未送出）');
    // C09 swipe-confirm UI preview only. No submission API is invoked.
@@ -57,5 +57,55 @@
    else points.forEach(item=>{const o=document.createElement('option');o.value=item.id;o.textContent=item.name+'｜'+item.address_text;p.appendChild(o)});
   }catch(e){a.textContent=e.message;p.innerHTML='<option value="">無法讀取核定集貨點</option>'}
  };
- window.lxC09PreviewPhotos=function(input){const out=document.getElementById('lx-photo-preview');if(!out)return;const files=[...(input.files||[])];const camera=document.getElementById('lx-placement-camera-button');if(!files.length)return;out.replaceChildren();if(files.length>1){out.textContent='每次只能選擇 1 張照片，請重新選擇。';input.value='';return}for(const f of files){if(!f.type.startsWith('image/')){out.textContent='僅接受圖片檔';input.value='';return}if(camera)camera.style.display='none';const img=document.createElement('img');img.alt='分享袋位置預覽';img.style.cssText='width:min(100%,320px);aspect-ratio:1/1;height:auto;object-fit:contain;object-position:center;background:#e9efec;border-radius:14px;display:block;margin:0 auto';const u=window.URL.createObjectURL(f);img.onload=()=>window.URL.revokeObjectURL(u);img.src=u;const card=document.createElement('div');card.style.cssText='display:flex;flex-direction:column;align-items:center;gap:12px;padding:16px 12px;border:1px solid #dce9e1;border-radius:16px;background:#f8fbf9;margin-top:12px;text-align:center';card.appendChild(img);const info=document.createElement('div');info.style.cssText='display:flex;flex-direction:column;align-items:center;gap:10px;width:100%';const status=document.createElement('strong');status.textContent='✓ 已拍攝 1 張';status.style.cssText='color:#087d4f;font-size:15px';info.appendChild(status);const retry=document.createElement('button');retry.type='button';retry.textContent='↻ 重新拍攝';retry.style.cssText='padding:8px 14px;border-radius:999px;border:1px solid #078b58;background:white;color:#078b58;font-weight:700;font-size:14px';retry.onclick=()=>{input.click()};info.appendChild(retry);card.appendChild(info);out.appendChild(card)}const note=document.createElement('p');note.textContent='僅本機預覽，尚未上傳至 Supabase。';out.appendChild(note)};
+
+ let lxCameraStream=null,lxPhotoFile=null;
+ window.lxC09PlacementPhoto=()=>lxPhotoFile;
+ window.lxC09CloseCamera=function(){if(lxCameraStream){lxCameraStream.getTracks().forEach(t=>t.stop());lxCameraStream=null}document.getElementById('lx-c09-camera-modal')?.remove()};
+ window.lxC09OpenCamera=async function(){
+  window.lxC09CloseCamera();
+  const fallback=()=>document.getElementById('lx-placement-photos')?.click();
+  if(!navigator.mediaDevices?.getUserMedia){fallback();return}
+  const modal=document.createElement('div');modal.id='lx-c09-camera-modal';
+  modal.style.cssText='position:fixed;inset:0;z-index:2147483000;background:#101b17;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 14px;box-sizing:border-box;color:white';
+  modal.innerHTML='<div style="width:min(100%,460px);display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><strong style="font-size:19px">拍攝分享袋放置位置</strong><button id="lx-c09-cam-close" type="button" style="background:#ffffff20;border:0;border-radius:30px;color:white;padding:10px 16px">關閉 ✕</button></div><div style="width:min(100%,460px);aspect-ratio:1/1;background:#000;border:2px solid #fff7;border-radius:16px;overflow:hidden;position:relative"><video id="lx-c09-cam-video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;display:block"></video><span style="position:absolute;bottom:12px;left:0;right:0;text-align:center;color:white;text-shadow:0 1px 5px #000;font-size:13px;pointer-events:none">框內即為拍攝範圍（1:1）</span></div><p id="lx-c09-cam-status" style="font-size:13px;color:#d6e7dc;text-align:center">正在啟動相機…</p><button id="lx-c09-cam-shutter" type="button" disabled style="width:76px;height:76px;border:7px solid #e1f6e8;background:white;border-radius:50%;margin:16px auto;opacity:.5" aria-label="拍照"></button><button id="lx-c09-cam-fallback" type="button" style="border:1px solid #a4d3b9;border-radius:30px;background:transparent;color:white;padding:10px 18px">改用手機原生相機</button>';
+  document.body.appendChild(modal);
+  const video=modal.querySelector('#lx-c09-cam-video'),shutter=modal.querySelector('#lx-c09-cam-shutter'),status=modal.querySelector('#lx-c09-cam-status');
+  modal.querySelector('#lx-c09-cam-close').onclick=window.lxC09CloseCamera;
+  modal.querySelector('#lx-c09-cam-fallback').onclick=()=>{window.lxC09CloseCamera();fallback()};
+  try{
+   const stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:1280}}});
+   if(!modal.isConnected){stream.getTracks().forEach(t=>t.stop());return}
+   lxCameraStream=stream;video.srcObject=stream;
+   await video.play();
+   status.textContent='請將分享袋及周圍取件位置放進正方形框內';
+   shutter.disabled=false;shutter.style.opacity='1';
+  }catch(err){status.textContent='無法開啟網頁相機，請使用下方原生相機。';shutter.disabled=true;shutter.style.opacity='.5';return}
+  shutter.onclick=()=>{
+   if(!video.videoWidth||!video.videoHeight)return;
+   const side=Math.min(video.videoWidth,video.videoHeight);
+   const canvas=document.createElement('canvas');canvas.width=canvas.height=Math.min(side,1440);
+   const sx=(video.videoWidth-side)/2,sy=(video.videoHeight-side)/2;
+   canvas.getContext('2d').drawImage(video,sx,sy,side,side,0,0,canvas.width,canvas.height);
+   canvas.toBlob(blob=>{
+    if(!blob){status.textContent='拍照失敗，請再試一次';return}
+    const file=new File([blob],'share-placement-'+Date.now()+'.jpg',{type:'image/jpeg'});
+    window.lxC09CloseCamera();window.lxC09RenderPhoto(file);
+   },'image/jpeg',.9);
+  };
+ };
+ window.lxC09RenderPhoto=function(f){
+  const out=document.getElementById('lx-photo-preview');if(!out)return;
+  const camera=document.getElementById('lx-placement-camera-button');
+  if(!f||!f.type.startsWith('image/')){out.textContent='僅接受圖片檔';return}
+  lxPhotoFile=f;if(camera)camera.style.display='none';out.replaceChildren();
+  const img=document.createElement('img');img.alt='分享袋位置預覽';img.style.cssText='width:min(100%,320px);aspect-ratio:1/1;object-fit:contain;object-position:center;background:#e9efec;border-radius:14px;display:block;margin:0 auto';
+  const u=window.URL.createObjectURL(f);img.onload=()=>window.URL.revokeObjectURL(u);img.src=u;
+  const card=document.createElement('div');card.style.cssText='display:flex;flex-direction:column;align-items:center;gap:12px;padding:16px 12px;border:1px solid #dce9e1;border-radius:16px;background:#f8fbf9;margin-top:12px;text-align:center';
+  card.appendChild(img);const info=document.createElement('div');info.style.cssText='display:flex;flex-direction:column;align-items:center;gap:10px;width:100%';
+  const status=document.createElement('strong');status.textContent='✓ 已拍攝 1 張';status.style.cssText='color:#087d4f;font-size:15px';info.appendChild(status);
+  const retry=document.createElement('button');retry.type='button';retry.textContent='↻ 重新拍攝';retry.style.cssText='padding:8px 14px;border-radius:999px;border:1px solid #078b58;background:white;color:#078b58;font-weight:700;font-size:14px';retry.onclick=window.lxC09OpenCamera;info.appendChild(retry);
+  card.appendChild(info);out.appendChild(card);
+  const note=document.createElement('p');note.textContent='僅本機預覽，尚未上傳至 Supabase。';out.appendChild(note);
+ };
+ window.lxC09PreviewPhotos=function(input){const files=[...(input.files||[])];if(files.length!==1){document.getElementById('lx-photo-preview').textContent='請選擇 1 張照片';return}window.lxC09RenderPhoto(files[0])};
 })();
