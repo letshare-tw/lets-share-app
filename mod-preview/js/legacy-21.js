@@ -51,7 +51,7 @@
   try{
    const [profiles,points]=await Promise.all([get('profiles?select=home_address&limit=1'),get('lx_approved_collection_points?select=id,name,address_text&enabled=eq.true&approved_at=not.is.null&order=name.asc')]);
    const address=profiles?.[0]?.home_address;
-   a.textContent=address?'會員住址：'+address:'尚未設定會員住址；請先至會員基本資料填寫。';
+   a.dataset.address=address||'';a.textContent=address?'會員住址：'+address:'尚未設定會員住址；請先至會員基本資料填寫。';
    p.innerHTML='';
    if(!points?.length){const o=document.createElement('option');o.value='';o.textContent='目前沒有已核定且啟用的集貨點';p.appendChild(o)}
    else points.forEach(item=>{const o=document.createElement('option');o.value=item.id;o.textContent=item.name+'｜'+item.address_text;p.appendChild(o)});
