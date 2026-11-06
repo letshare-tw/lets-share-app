@@ -12,10 +12,12 @@
  async function get(path){const token=session()?.token;if(!token)throw Error('請先登入會員');const response=await fetch(URL+'/rest/v1/'+path,{headers:{apikey:KEY,Authorization:'Bearer '+token},cache:'no-store'});if(!response.ok)throw Error('讀取資料失敗（HTTP '+response.status+'）');return response.json()}
  window.share=function(){
    let html=original();
-   html=html.replace('請準備至少 2 件衣物，選擇集貨點','請準備至少 2 件衣物，確認取件地點');
+   html=html.replace('請準備至少 2 件衣物，選擇集貨點','請準備至少 2 件衣物');
+   html=html.replace('同意分享條款','確認取件地點').replace('衣物交付後不退還；不合格衣物授權依法轉贈或回收','預設會員住址，也可選擇已核定集貨點');
+   html=html.replace(/<label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;line-height:1\.6"><input id="agree"[\s\S]*?<\/label>/,'<p class="muted" style="font-size:13px">分享服務條款於開通服務時確認；如條款有重大更新，須重新取得同意。正式分享功能尚未開放。</p>');
    html=html.replace('預約送件或聯絡樂享職人','放置分享袋並拍攝位置').replace('由系統安排後續物流（本版模擬）','照片供日後受派騎手辨識取件位置');
    html=html.replace(/<label>舊版模擬集貨點（目前不送出）<\/label><select id="point" class="field">[\s\S]*?<\/select>/,
-    '<label>取件地點</label><select id="lx-pickup-kind" class="field" onchange="lxC09ChangePickup()"><option value="home">會員住址（預設）</option><option value="point">核定集貨點</option></select><div id="lx-pickup-address" class="muted" aria-live="polite">正在讀取會員住址…</div><select id="lx-approved-points" class="field" style="display:none" aria-label="已核定集貨點"></select><label>分享袋放置位置說明</label><textarea id="lx-placement-note" class="field" maxlength="300" placeholder="例如：一樓大門右側指定置物架"></textarea><label>分享袋放置位置照片（正式提交時至少 1 張，最多 3 張）</label><input id="lx-placement-photos" type="file" accept="image/*" capture="environment" multiple onchange="lxC09PreviewPhotos(this)"><div id="lx-photo-preview" class="muted">目前尚未選取照片。測試階段只在本機預覽，尚未上傳。</div>');
+    '<label>取件地點</label><select id="lx-pickup-kind" class="field" onchange="lxC09ChangePickup()"><option value="home">會員住址（預設）</option><option value="point">核定集貨點</option></select><div id="lx-pickup-address" class="muted" aria-live="polite">正在讀取會員住址…</div><select id="lx-approved-points" class="field" style="display:none" aria-label="已核定集貨點"></select><label>分享袋放置位置說明</label><textarea id="lx-placement-note" class="field" maxlength="300" placeholder="例如：一樓大門右側指定置物架"></textarea><label>分享袋放置位置照片（正式提交時 1 張）</label><input id="lx-placement-photos" type="file" accept="image/*" capture="environment" onchange="lxC09PreviewPhotos(this)"><div id="lx-photo-preview" class="muted">目前尚未選取照片。測試階段只在本機預覽，尚未上傳。</div>');
    html=html.replace('前往會員中心建立 Supabase 分享草稿','建立／取得 Supabase 草稿（地點及照片尚未送出）');
    setTimeout(window.lxC09LoadLocations,0);
    return html;
@@ -32,5 +34,5 @@
    else points.forEach(item=>{const o=document.createElement('option');o.value=item.id;o.textContent=item.name+'｜'+item.address_text;p.appendChild(o)});
   }catch(e){a.textContent=e.message;p.innerHTML='<option value="">無法讀取核定集貨點</option>'}
  };
- window.lxC09PreviewPhotos=function(input){const out=document.getElementById('lx-photo-preview');if(!out)return;const files=[...(input.files||[])];out.replaceChildren();if(files.length>3){out.textContent='最多只能選擇 3 張照片，請重新選擇。';input.value='';return}if(!files.length){out.textContent='尚未選取照片';return}for(const f of files){if(!f.type.startsWith('image/')){out.textContent='僅接受圖片檔';input.value='';return}const img=document.createElement('img');img.alt='分享袋位置預覽';img.style.cssText='width:31%;margin:1%;border-radius:8px;vertical-align:top';const u=URL.createObjectURL(f);img.onload=()=>URL.revokeObjectURL(u);img.src=u;out.appendChild(img)}const note=document.createElement('p');note.textContent='僅本機預覽，尚未上傳至 Supabase。';out.appendChild(note)};
+ window.lxC09PreviewPhotos=function(input){const out=document.getElementById('lx-photo-preview');if(!out)return;const files=[...(input.files||[])];out.replaceChildren();if(files.length>1){out.textContent='每次只能選擇 1 張照片，請重新選擇。';input.value='';return}if(!files.length){out.textContent='尚未選取照片';return}for(const f of files){if(!f.type.startsWith('image/')){out.textContent='僅接受圖片檔';input.value='';return}const img=document.createElement('img');img.alt='分享袋位置預覽';img.style.cssText='max-width:100%;width:240px;border-radius:8px;vertical-align:top';const u=URL.createObjectURL(f);img.onload=()=>URL.revokeObjectURL(u);img.src=u;out.appendChild(img)}const note=document.createElement('p');note.textContent='僅本機預覽，尚未上傳至 Supabase。';out.appendChild(note)};
 })();
