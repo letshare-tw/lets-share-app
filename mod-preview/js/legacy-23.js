@@ -51,7 +51,19 @@ window.share=function(){
    const field=document.getElementById(id);if(field){field.addEventListener('input',invalidate);field.addEventListener('change',invalidate)}
   }
   const preview=document.getElementById('lx-photo-preview');
-  if(preview)new MutationObserver(()=>{invalidate()}).observe(preview,{childList:true});
+  if(preview)new MutationObserver(()=>{
+   const txt=el.textContent||'';
+   // Restoring a saved photo updates the preview AFTER the save status.
+   // Do not invalidate an already restored, unchanged server draft.
+   if(/^✓ 已從 Supabase 恢復上次儲存的草稿/.test(txt)){el.dataset.saved='1'}
+   else if(!/^✓ 草稿已儲存至 Supabase/.test(txt)){el.dataset.saved='0'}
+   window.lxC09UpdateSwipeLock();
+  }).observe(preview,{childList:true});
+  const address=document.getElementById('lx-pickup-address');
+  if(address)new MutationObserver(window.lxC09UpdateSwipeLock).observe(address,{attributes:true,attributeFilter:['data-address']});
+  const points=document.getElementById('lx-approved-points');
+  if(points)new MutationObserver(window.lxC09UpdateSwipeLock).observe(points,{childList:true});
+  window.lxC09InitSwipe?.();
   window.lxC09UpdateSwipeLock();
  },600);
  return html;
