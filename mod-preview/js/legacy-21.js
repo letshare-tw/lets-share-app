@@ -67,25 +67,28 @@
   if(!navigator.mediaDevices?.getUserMedia){fallback();return}
   const modal=document.createElement('div');modal.id='lx-c09-camera-modal';
   modal.style.cssText='position:fixed;inset:0;z-index:2147483000;background:#ffffff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 14px;box-sizing:border-box;color:#17613f';
-  modal.innerHTML='<div style="width:min(100%,460px);display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><strong style="font-size:19px">拍攝分享袋放置位置</strong><button id="lx-c09-cam-close" type="button" style="background:#e8f5ed;border:1px solid #c7e5d2;border-radius:30px;color:#08784c;padding:10px 16px">關閉 ✕</button></div><div style="width:min(100%,460px);aspect-ratio:1/1;background:#000;border:2px solid #fff7;border-radius:16px;overflow:hidden;position:relative"><video id="lx-c09-cam-video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;display:block"></video><span style="position:absolute;bottom:12px;left:0;right:0;text-align:center;color:white;text-shadow:0 1px 5px #000;font-size:13px;pointer-events:none">框內即為拍攝範圍（1:1）</span></div><p id="lx-c09-cam-status" style="font-size:13px;color:#357252;text-align:center">正在啟動相機…</p><button id="lx-c09-cam-shutter" type="button" disabled style="width:76px;height:76px;border:7px solid #d6efdf;background:#078b58;border-radius:50%;margin:16px auto;opacity:.5" aria-label="拍照"></button><button id="lx-c09-cam-fallback" type="button" style="border:1px solid #078b58;border-radius:30px;background:#f3faf5;color:#08784c;padding:10px 18px">改用手機原生相機</button>';
+  modal.innerHTML='<div style="width:min(100%,460px);display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><strong style="font-size:19px">拍攝分享袋放置位置</strong><button id="lx-c09-cam-close" type="button" style="background:#e8f5ed;border:1px solid #c7e5d2;border-radius:30px;color:#08784c;padding:10px 16px">關閉 ✕</button></div><div style="width:min(100%,460px);aspect-ratio:3/5;max-height:65dvh;background:#000;border:2px solid #fff7;border-radius:16px;overflow:hidden;position:relative"><video id="lx-c09-cam-video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;display:block"></video><span style="position:absolute;bottom:12px;left:0;right:0;text-align:center;color:white;text-shadow:0 1px 5px #000;font-size:13px;pointer-events:none">框內即為拍攝範圍（3:5）</span></div><p id="lx-c09-cam-status" style="font-size:13px;color:#357252;text-align:center">正在啟動相機…</p><button id="lx-c09-cam-shutter" type="button" disabled style="width:76px;height:76px;border:7px solid #d6efdf;background:#078b58;border-radius:50%;margin:16px auto;opacity:.5" aria-label="拍照"></button><button id="lx-c09-cam-fallback" type="button" style="border:1px solid #078b58;border-radius:30px;background:#f3faf5;color:#08784c;padding:10px 18px">改用手機原生相機</button>';
   document.body.appendChild(modal);
   const video=modal.querySelector('#lx-c09-cam-video'),shutter=modal.querySelector('#lx-c09-cam-shutter'),status=modal.querySelector('#lx-c09-cam-status');
   modal.querySelector('#lx-c09-cam-close').onclick=window.lxC09CloseCamera;
   modal.querySelector('#lx-c09-cam-fallback').onclick=()=>{window.lxC09CloseCamera();fallback()};
   try{
-   const stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:1280}}});
+   const stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:900},height:{ideal:1500}}});
    if(!modal.isConnected){stream.getTracks().forEach(t=>t.stop());return}
    lxCameraStream=stream;video.srcObject=stream;
    await video.play();
-   status.textContent='請將分享袋及周圍取件位置放進正方形框內';
+   status.textContent='請將分享袋及周圍取件位置放進 3:5 取景框內';
    shutter.disabled=false;shutter.style.opacity='1';
   }catch(err){status.textContent='無法開啟網頁相機，請使用下方原生相機。';shutter.disabled=true;shutter.style.opacity='.5';return}
   shutter.onclick=()=>{
    if(!video.videoWidth||!video.videoHeight)return;
-   const side=Math.min(video.videoWidth,video.videoHeight);
-   const canvas=document.createElement('canvas');canvas.width=canvas.height=Math.min(side,1440);
-   const sx=(video.videoWidth-side)/2,sy=(video.videoHeight-side)/2;
-   canvas.getContext('2d').drawImage(video,sx,sy,side,side,0,0,canvas.width,canvas.height);
+   const frame=video.getBoundingClientRect();const ratio=frame.width/frame.height;
+   const sourceRatio=video.videoWidth/video.videoHeight;
+   const cropW=sourceRatio>ratio?video.videoHeight*ratio:video.videoWidth;
+   const cropH=sourceRatio>ratio?video.videoHeight:video.videoWidth/ratio;
+   const canvas=document.createElement('canvas');canvas.width=900;canvas.height=1500;
+   const sx=(video.videoWidth-cropW)/2,sy=(video.videoHeight-cropH)/2;
+   canvas.getContext('2d').drawImage(video,sx,sy,cropW,cropH,0,0,canvas.width,canvas.height);
    canvas.toBlob(blob=>{
     if(!blob){status.textContent='拍照失敗，請再試一次';return}
     const file=new File([blob],'share-placement-'+Date.now()+'.jpg',{type:'image/jpeg'});
@@ -98,7 +101,7 @@
   const camera=document.getElementById('lx-placement-camera-button');
   if(!f||!f.type.startsWith('image/')){out.textContent='僅接受圖片檔';return}
   lxPhotoFile=f;if(camera)camera.style.display='none';out.replaceChildren();
-  const img=document.createElement('img');img.alt='分享袋位置預覽';img.style.cssText='width:min(100%,320px);aspect-ratio:1/1;object-fit:contain;object-position:center;background:#e9efec;border-radius:14px;display:block;margin:0 auto';
+  const img=document.createElement('img');img.alt='分享袋位置預覽';img.style.cssText='width:min(100%,320px);aspect-ratio:3/5;object-fit:contain;object-position:center;background:#e9efec;border-radius:14px;display:block;margin:0 auto';
   const u=window.URL.createObjectURL(f);img.onload=()=>window.URL.revokeObjectURL(u);img.src=u;
   const card=document.createElement('div');card.style.cssText='display:flex;flex-direction:column;align-items:center;gap:12px;padding:16px 12px;border:1px solid #dce9e1;border-radius:16px;background:#f8fbf9;margin-top:12px;text-align:center';
   card.appendChild(img);const info=document.createElement('div');info.style.cssText='display:flex;flex-direction:column;align-items:center;gap:10px;width:100%';
