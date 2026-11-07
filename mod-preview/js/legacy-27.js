@@ -41,25 +41,19 @@ window.lxServiceLoad=async function(){
  if(!node('lx-service-activation'))return;
  state('正在檢查分享服務啟用狀態…');
  try{
-  const {id}=session();
-  const settings=await api('lx_share_submission_settings?select=agreement_version,agreement_published_at,submission_enabled&id=eq.1&limit=1');
+  const data=await api('rpc/lx_share_service_status',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
   if(seq!==serial||!node('lx-service-activation'))return;
-  const setting=settings?.[0];
-  if(!setting?.agreement_version||!setting.agreement_published_at){
+  if(!data?.published){
    setActivationUI(true,null);
    state('正式分享協議尚未發布，目前僅開放分享草稿與拍照測試。');
    return;
   }
-  const version=setting.agreement_version;
-  const agreements=await api('lx_share_agreement_versions?select=version,content,published_at&version=eq.'+encodeURIComponent(version)+'&limit=1');
-  const consent=await api('lx_share_service_consents?select=agreement_version,agreed_at&user_id=eq.'+encodeURIComponent(id)+'&agreement_version=eq.'+encodeURIComponent(version)+'&limit=1');
-  if(seq!==serial||!node('lx-service-activation'))return;
-  const agreement=agreements?.[0];
-  if(!agreement){setActivationUI(true,version);state('協議版本尚未完成發布，暫不開放啟用。');return}
+  const version=data.version;
   const content=node('lx-service-agreement');
-  if(content){content.textContent=agreement.content;content.hidden=false}
-  const activated=!!consent?.length;
+  if(content){content.textContent=data.content;content.hidden=false}
+  const activated=!!data.activated;
   setActivationUI(activated,version);
+  const versionLabel=node('lx-service-version');if(versionLabel)versionLabel.dataset.version=version;
   if(activated)state('✓ 已啟用分享服務，已記錄本版本同意。');
   else state('請閱讀協議並勾選同意，再按「啟用分享服務」。');
  }catch(err){setActivationUI(true,null);state('無法確認啟用狀態：'+err.message,'#b42318')}
