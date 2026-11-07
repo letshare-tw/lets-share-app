@@ -11,7 +11,7 @@ function mount(){
  const root=heading.closest('.card')||heading.parentElement;
  if(!root)return;
  if(existing&&existing.isConnected){
-  if(root.contains(existing))return;
+  if(root.contains(existing)||existing.previousElementSibling===root)return;
   // Remove duplicated panel from another visible location before relocating.
   existing.remove();
  }
