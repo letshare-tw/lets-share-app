@@ -63,10 +63,10 @@ if(typeof original==='function')window.lxHqIncidentLoad=async function(){
   // Attach a history action to each case card after the existing renderer finishes.
   list.querySelectorAll('article').forEach(card=>{
    if(card.querySelector('.lx-c09-history-btn'))return;
-   const content=card.textContent||'';
-   const short=content.match(/案件\s+([0-9a-f]{8})/i)?.[1];
-   if(!short)return;
-   // Lookup full UUID from the original server response is required; do not guess it.
+   const field=card.querySelector('textarea[id^="lx-hq-note-"]');
+   const id=field?.id.slice('lx-hq-note-'.length);
+   if(!id)return;
+   const button=document.createElement('button');button.type='button';button.className='secondary lx-c09-history-btn';button.textContent='查看處理歷程';button.onclick=()=>window.lxC09HqHistory(id);card.appendChild(button);
   });
  }
  await window.lxC09Overview();
