@@ -52,11 +52,18 @@ if(typeof rider==='function')window.rider=function(){
  const panel='<section class="card" id="lx-c09-test-rider"><h3 style="color:#08784c">C09 跨角色測試｜騎手通報</h3><p class="muted">僅限授權管理帳號。這是獨立測試案件，不會建立配送任務、取件紀錄或款項。</p><label>異常選項</label><select id="lx-c09-test-reason" class="field" onchange="lxC09TestReasonChanged()">'+Object.entries(reason).map(([v,t])=>'<option value="'+v+'">'+t+'</option>').join('')+'</select><div id="lx-c09-test-other" hidden><label>其他異常說明</label><textarea id="lx-c09-test-note" class="field" rows="2" placeholder="至少5字"></textarea></div><button id="lx-c09-test-send" class="primary wide" type="button" onclick="lxC09TestReport()">建立測試異常</button><p id="lx-c09-test-rider-status" role="status" aria-live="polite"></p></section>';
  return html+panel;
 };
-const hq=window.hq;
-if(typeof hq==='function')window.hq=function(){
- const html=hq();
- const panel='<section class="card" id="lx-c09-test-hq"><h3 style="color:#08784c">C09 跨角色測試｜總部案件</h3><p class="muted">測試資料與正式騎手通報完全分開，不會影響派單或賠償。</p><div id="lx-c09-test-list">讀取中…</div><p id="lx-c09-test-hq-status" role="status" aria-live="polite"></p><button class="secondary" type="button" onclick="lxC09TestList()">重新讀取測試案件</button></section>';
+function mountTestHq(){
+ const heading=[...document.querySelectorAll('h1,h2,h3')].find(n=>n.textContent.trim()==='異常處理');
+ if(!heading)return;
+ const root=heading.closest('.card')||heading.parentElement;
+ if(!root||document.getElementById('lx-c09-test-hq'))return;
+ const section=document.createElement('section');
+ section.id='lx-c09-test-hq';section.className='card';section.style.marginTop='16px';
+ section.innerHTML='<h3 style="color:#08784c">C09 跨角色測試｜總部案件</h3><p class="muted">獨立測試資料，不影響正式派單、簽收或賠償。</p><div id="lx-c09-test-list">讀取中…</div><p id="lx-c09-test-hq-status" role="status" aria-live="polite"></p><button class="secondary" type="button" onclick="lxC09TestList()">重新讀取測試案件</button>';
+ root.insertAdjacentElement('afterend',section);
  setTimeout(()=>window.lxC09TestList(),100);
- return html+panel;
-};
+}
+const observer=new MutationObserver(()=>mountTestHq());
+function start(){observer.observe(document.body,{childList:true,subtree:true});mountTestHq()}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
