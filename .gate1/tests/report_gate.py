@@ -38,6 +38,22 @@ if not failures:
    assert value['tests'] and all(x['status']=='PASS' for x in value['tests'])
    if name=='submit-http-api':assert value['completed'] is True
    matrix.extend({**x,'suite':name} for x in value['tests'])
+  # DEPLOY-03: the final gate must include real Chromium + actual Edge evidence.
+  browser_log=(api/'p1-browser-e2e.log').read_text()
+  required_browser=[
+   'PASS browser real JWT -> trusted Deno submit handler -> DB transaction',
+   'PASS actual Edge entry rejects missing JWT',
+   'PASS actual Edge entry rejects invalid JWT',
+   'PASS authenticated member cannot invoke service-only RPC',
+   'PASS actual Edge entry rejects cross-account request',
+   'PASS actual Edge entry idempotent replay',
+   'PASS actual Edge entry origin allowlist',
+   'PASS actual Edge entry CORS preflight',
+   'PASS DB verifies submitted request, Storage photo, one bag, exact 48 hours',
+  ]
+  for evidence in required_browser:
+   assert evidence in browser_log, 'Missing browser evidence: '+evidence
+  matrix.extend({'name':evidence,'status':'PASS','suite':'deploy03-browser-edge'} for evidence in required_browser)
   assert 'PASS: new connection confirms real Auth' in (api/'local-final-postflight.log').read_text()
   assert 'PostgreSQL 17' in (root/'gate1-pg17-smoke'/'pg-version.txt').read_text() or (root/'gate1-pg17-smoke'/'pg-version.txt').read_text().startswith('17.')
  except Exception as e:failures.append(type(e).__name__+': '+str(e))
