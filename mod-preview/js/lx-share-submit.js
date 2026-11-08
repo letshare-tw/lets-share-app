@@ -7,7 +7,9 @@ const KEY='sb_publishable_ZCqKEuqpTiZ46p9fx_JXvA_av4JwD3I';
 const SESSION_KEY='lx_supabase_auth_v066g';
 const previous=window.share;
 if(typeof previous!=='function')return;
-let generation=0,submitting=false;
+let generation=0,submitting=false,verifiedRequestId=null;
+function currentPanel(panel){return panel&&node('lx-submit-panel')===panel}
+function invalidate(message){const panel=node('lx-submit-panel');if(!panel)return;panel.dataset.ready='0';setEnabled(false);if(message)status(message)}
 function node(id){return document.getElementById(id)}
 function credentials(){
  let session;try{session=JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null')}catch{}
@@ -48,7 +50,9 @@ window.lxSubmitLoad=async function(){
   if(seq!==generation||!node('lx-submit-panel'))return;
   if(!preflight?.ready){status('尚未符合提交條件：'+(preflight?.reason||'請檢查草稿與分享協議'));return}
   if(preflight.agreement_version!==service.version){status('分享協議版本已變更，請重新閱讀並啟用。',true);return}
+  if(!currentPanel(panel))return;
   panel.dataset.requestId=requestId;panel.dataset.version=service.version;panel.dataset.ready='1';
+  verifiedRequestId=requestId;
   status('草稿檢查通過。請確認三項同意事項後正式提交。');
   window.lxSubmitConsentChanged();
  }catch(err){if(seq===generation)status('提交資格檢查失敗：'+err.message,true)}
@@ -60,22 +64,47 @@ window.lxSubmitNow=async function(){
  const requestId=panel.dataset.requestId,version=panel.dataset.version;
  try{
   if(!requestId||!version)throw Error('提交資格已失效，請重新檢查');
+  status('正在重新確認草稿資格…');
+  const preflight=await api('rpc/lx_share_submission_preflight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_request_id:requestId})});
+  if(!preflight?.ready||preflight.agreement_version!==version)throw Error('草稿或協議已變更，請重新檢查');
   status('正在正式提交，請勿重複點擊…');
   const result=await api('rpc/lx_submit_share_request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
    p_request_id:requestId,p_agreement_version:version,p_transfer_agreed:true,p_no_return_agreed:true,p_recycling_agreed:true
   })});
   if(result!==requestId)throw Error('提交結果無法核對，請到會員中心查詢');
-  const bags=await api('rpc/lx_get_my_share_bags',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
-  const bag=(bags||[]).find(item=>item.share_request_id===requestId);
+  const bag=await findBag(requestId);
   if(!bag)throw Error('申請已提交，但尚未查到分享袋。請聯絡客服，不要重複提交');
   const deadline=new Date(bag.pickup_deadline_at);
-  status('✓ 分享成功！袋號：'+bag.bag_code+'。取件截止：'+(Number.isNaN(deadline.getTime())?'請洽客服':deadline.toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}))+'（台灣時間）。等待總部安排騎手。');
+  showBag(bag);
   panel.dataset.ready='0';panel.dataset.requestId='';
  }catch(err){
-  status('提交結果待確認：'+err.message+'。如網路中斷，請先到會員中心確認，勿重複送出。',true);
   panel.dataset.ready='0';
+  try{const bag=await findBag(requestId);if(bag){showBag(bag);return}}catch(_){}
+  status('提交結果尚未確認：'+err.message+'。請點「查詢提交結果」，不要再次送出。',true);
  }finally{submitting=false;setEnabled(false)}
 };
+async function findBag(requestId){
+ if(!requestId)return null;
+ const bags=await api('rpc/lx_get_my_share_bags',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+ return Array.isArray(bags)?bags.find(item=>item.share_request_id===requestId)||null:null;
+}
+function showBag(bag){
+ const deadline=new Date(bag.pickup_deadline_at);
+ status('✓ 分享成功！袋號：'+bag.bag_code+'。取件截止：'+(Number.isNaN(deadline.getTime())?'請洽客服':deadline.toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}))+'（台灣時間）。等待總部安排騎手。');
+ invalidate();verifiedRequestId=null;
+}
+window.lxSubmitRecover=async function(){
+ try{
+  const id=verifiedRequestId||node('lx-submit-panel')?.dataset.requestId;
+  const bag=await findBag(id);
+  if(bag)showBag(bag);
+  else status('尚未查到分享袋。請先確認會員中心的分享紀錄，勿直接重複提交。',true);
+ }catch(err){status('查詢失敗：'+err.message,true)}
+};
+// A saved draft invalidates the old preflight, even if its request ID remains unchanged.
+document.addEventListener('click',event=>{
+ if(event.target?.closest?.('#lx-c09-save-draft'))invalidate('草稿正在更新，儲存完成後請重新檢查提交資格。');
+});
 window.share=function(){
  const html=previous();
  const panel='<section id="lx-submit-panel" data-ready="0" class="card" style="background:#fff;border:1px solid #b9d7c5;border-radius:16px;padding:16px;margin:16px 0">'+
@@ -85,11 +114,21 @@ window.share=function(){
  '<label style="display:block;margin:10px 0;font-size:13px"><input id="lx-submit-no-return" type="checkbox" onchange="lxSubmitConsentChanged()"> 我同意完成交付後衣物原則上不退還</label>'+
  '<label style="display:block;margin:10px 0;font-size:13px"><input id="lx-submit-recycling" type="checkbox" onchange="lxSubmitConsentChanged()"> 我授權不合格及未售衣物依法轉贈或回收</label>'+
  '<button id="lx-submit-button" type="button" onclick="lxSubmitNow()" disabled style="width:100%;padding:12px;border:0;border-radius:999px;background:#078b58;color:white;font-weight:700">確認正式提交分享</button>'+
+ '<button type="button" onclick="lxSubmitRecover()" style="margin-top:8px;border:0;background:transparent;color:#08784c">查詢提交結果</button>'+ 
  '<button type="button" onclick="lxSubmitLoad()" style="margin-top:8px;border:0;background:transparent;color:#08784c">重新檢查提交資格（儲存草稿後請點此）</button>'+
  '<p style="font-size:12px;color:#60786b">正式協議與後端提交開關未啟用前無法提交。提交後不會自動派單。</p></section>';
  const anchor='<main class="main">';
  const result=html.includes(anchor)?html.replace(anchor,anchor+panel):html;
- setTimeout(()=>window.lxSubmitLoad?.(),650);
+ // Initialize after the share view is inserted, without a fixed timing assumption.
+ queueMicrotask(()=>{
+  const panel=node('lx-submit-panel');
+  if(panel)window.lxSubmitLoad?.();
+  else{
+   const observer=new MutationObserver(()=>{if(node('lx-submit-panel')){observer.disconnect();window.lxSubmitLoad?.()}});
+   observer.observe(document.body,{childList:true,subtree:true});
+   setTimeout(()=>observer.disconnect(),10000);
+  }
+ });
  return result;
 };
 })();
