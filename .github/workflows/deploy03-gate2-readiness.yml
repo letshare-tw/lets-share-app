@@ -12,7 +12,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Verify Gate 2 isolation and integration contract
-        run: python3 .gate1/tests/gate2-readiness.py | tee gate2-readiness.log
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .gate1/tests/gate2-readiness.py | tee gate2-readiness.log
+      - name: Check local integration runtime and report integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum -c .gate1/CI-SHA256SUMS
+          python3 -m py_compile .gate1/tests/gate2-readiness.py .gate1/tests/report_gate.py
+          test -f .gate1/runtime/p1-browser-server.ts
+          test -f .gate1/runtime/edge-submit-candidate.sql
+          test -f .gate1/tests/p1-browser-e2e.cjs
+          echo 'PASS Gate2 local integration prerequisites and integrity'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
