@@ -106,6 +106,40 @@ jobs:
               THEN RAISE EXCEPTION 'fixture survived rollback'; END IF;
           END $gate$;
           SQL
+          psql -X -v ON_ERROR_STOP=1 <<'SQL'
+          DO $gate$
+          DECLARE
+            fn record;
+          BEGIN
+            FOR fn IN
+              SELECT p.oid, p.proname
+              FROM pg_proc p
+              JOIN pg_namespace n ON n.oid=p.pronamespace
+              WHERE n.nspname='public' AND p.proname LIKE 'dev01b_v5_%'
+            LOOP
+              IF NOT (SELECT prosecdef FROM pg_proc WHERE oid=fn.oid) THEN
+                RAISE EXCEPTION 'SECURITY DEFINER missing: %',fn.proname;
+              END IF;
+              IF NOT (SELECT EXISTS(
+                SELECT 1 FROM unnest((SELECT proconfig FROM pg_proc WHERE oid=fn.oid)) setting
+                WHERE setting='search_path='
+              )) THEN RAISE EXCEPTION 'hardened search_path missing: %',fn.proname; END IF;
+              IF has_function_privilege('anon',fn.oid,'EXECUTE')
+                 OR has_function_privilege('authenticated',fn.oid,'EXECUTE')
+                 OR has_function_privilege('public',fn.oid,'EXECUTE') THEN
+                RAISE EXCEPTION 'unauthorized EXECUTE: %',fn.proname;
+              END IF;
+              IF NOT has_function_privilege('service_role',fn.oid,'EXECUTE') THEN
+                RAISE EXCEPTION 'service_role EXECUTE missing: %',fn.proname;
+              END IF;
+            END LOOP;
+            IF (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+              WHERE n.nspname='public' AND p.proname LIKE 'dev01b_v5_%') <> 5 THEN
+              RAISE EXCEPTION 'expected exactly five ledger functions';
+            END IF;
+          END $gate$;
+          SQL
+          echo 'PASS: all five SECURITY DEFINER search_path and EXECUTE policies' | tee security-result.txt
           echo 'PASS: V5 ledger migration and basic grants' | tee ledger-result.txt
       - uses: actions/upload-artifact@v4
         if: always()
@@ -115,6 +149,7 @@ jobs:
             pg-version.txt
             pg-result.txt
             ledger-result.txt
+            security-result.txt
   deno-runtime:
     runs-on: ubuntu-latest
     steps:
