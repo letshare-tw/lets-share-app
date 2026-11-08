@@ -26,6 +26,11 @@ jobs:
       PGDATABASE: gate1
     steps:
       - uses: actions/checkout@v4
+      - name: Verify pinned DEV-01B source inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum --check .gate1/SHA256SUMS
       - name: PostgreSQL 17 runtime and isolated transaction rollback
         shell: bash
         run: |
@@ -64,6 +69,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Verify pinned DEV-01B source inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum --check .gate1/SHA256SUMS
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
