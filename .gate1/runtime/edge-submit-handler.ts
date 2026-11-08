@@ -31,7 +31,7 @@ export function submissionHandler(auth:SupabaseClient,service:SupabaseClient){
   if(current.data.status==='submitted'){const r=await receipt();return r?reply(200,{...r,replayed:true}):reply(409,{error:'conflict'});}
   if(current.data.status!=='draft')return reply(409,{error:'not_draft'});
   const result=await service.rpc('lx_edge_submit_share_request',{p_user:uid,p_request:body.request_id,p_version:body.agreement_version,p_transfer:true,p_no_return:true,p_recycling:true});
-  if(result.error){const replay=await receipt();if(replay)return reply(200,{...replay,replayed:true});return reply(result.error.code==='P0001'||result.error.code==='P0002'?422:503,{error:'request_rejected'});}
+  if(result.error){console.error('DEPLOY03_RPC_FAILURE',JSON.stringify({code:result.error.code??'unknown',httpStatus:result.status??null}));const replay=await receipt();if(replay)return reply(200,{...replay,replayed:true});return reply(result.error.code==='P0001'||result.error.code==='P0002'?422:503,{error:'request_rejected'});}
   const r=await receipt();return r?reply(200,{...r,replayed:false}):reply(503,{error:'receipt_unavailable'});
  };
 }
