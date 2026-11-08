@@ -12,7 +12,7 @@ const CONFIG=Object.freeze({
 });
 const $=id=>document.getElementById(id);
 const state={token:'',uid:'',draft:'',address:'',points:[],photo:'',version:'',busy:false,ready:false};
-const PHOTO_MAX_BYTES=300*1024;
+const PHOTO_MAX_BYTES=300000;
 const PHOTO_MAX_EDGE=1280;
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const note=(message)=>{$('status').textContent=message;};
