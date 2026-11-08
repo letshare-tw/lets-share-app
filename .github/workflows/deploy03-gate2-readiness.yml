@@ -20,7 +20,34 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sha256sum -c .gate1/CI-SHA256SUMS
+          # Gate 1 pins original source inputs; its own workflow is mutable CI plumbing.\n          grep -v '  .github/workflows/dev01b-v5-gate1.yml
+          python3 -m py_compile .gate1/tests/gate2-readiness.py .gate1/tests/report_gate.py
+          test -f .gate1/runtime/p1-browser-server.ts
+          test -f .gate1/runtime/edge-submit-candidate.sql
+          test -f .gate1/tests/p1-browser-e2e.cjs
+          echo 'PASS Gate2 local integration prerequisites and integrity'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gate2-readiness-evidence
+          path: gate2-readiness.log
+          if-no-files-found: warn
+      - name: Publish Gate 2 readiness run URL (not deployment approval)
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          GH_RUN_ID: ${{ github.run_id }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          state=failure
+          if [[ "$JOB_STATUS" == success ]]; then state=success; fi
+          jq -n --arg state "$state" --arg target_url "https://github.com/$GH_REPOSITORY/actions/runs/$GH_RUN_ID" '{state:$state,target_url:$target_url,description:"Gate 2 offline readiness only; no remote deployment",context:"DEPLOY-03/Gate-2-Readiness"}' > /tmp/gate2-status.json
+          curl --fail-with-body --silent --show-error --retry 3 -X POST -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'Content-Type: application/json' --data-binary @/tmp/gate2-status.json "https://api.github.com/repos/$GH_REPOSITORY/statuses/$GH_SHA"
+ .gate1/CI-SHA256SUMS | sha256sum -c -
           python3 -m py_compile .gate1/tests/gate2-readiness.py .gate1/tests/report_gate.py
           test -f .gate1/runtime/p1-browser-server.ts
           test -f .gate1/runtime/edge-submit-candidate.sql
