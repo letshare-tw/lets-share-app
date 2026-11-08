@@ -414,8 +414,12 @@ jobs:
           done
           if [ "$ready" != 1 ]; then cat .gate1-artifacts/p1-browser-server.log; exit 1; fi
           node .gate1/tests/p1-browser-e2e.cjs |& tee .gate1-artifacts/p1-browser-e2e.log
+          set +e
           wait "$server_pid"
+          rc=$?
+          set -e
           cat .gate1-artifacts/p1-browser-server.log
+          exit "$rc"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
