@@ -1,8 +1,12 @@
 // P1-FIX test branch only. No service-role credentials or production endpoint.
+// Only a page served from loopback may inject isolated test endpoints.
+const loopback=['127.0.0.1','localhost'].includes(location.hostname);
+const localConfig=loopback?globalThis.__P1_LOCAL_TEST_CONFIG__:null;
+const localUrl=(value)=>{try{const u=new URL(value);return u.protocol==='http:'&&['127.0.0.1','localhost'].includes(u.hostname);}catch{return false;}};
 const CONFIG=Object.freeze({
-  base:'https://rfwqcrvxyjhtmafnbuyy.supabase.co',
-  key:'', // Supply test-project publishable key only through approved test deployment.
-  submitEndpoint:'', // Dedicated trusted Edge endpoint is NOT deployed or authorized yet.
+  base:localConfig&&localUrl(localConfig.base)?localConfig.base:'https://rfwqcrvxyjhtmafnbuyy.supabase.co',
+  key:localConfig&&localUrl(localConfig.base)?String(localConfig.key||''):'',
+  submitEndpoint:localConfig&&localUrl(localConfig.submitEndpoint)?localConfig.submitEndpoint:'',
   sessionKey:'lx_supabase_auth_v066g',
   bucket:'share-placement-photos'
 });
