@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 jobs:
   isolated-pg17:
     runs-on: ubuntu-24.04
@@ -357,14 +358,17 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f .gate1/runtime/internal-submit.sql
           psql -X -v ON_ERROR_STOP=1 -f .gate1/runtime/local-ledger-fixture.sql
           psql -X -v ON_ERROR_STOP=1 -c "NOTIFY pgrst, 'reload schema';"
-          deno check .gate1/runtime/fixtures.ts .gate1/runtime/submit_api.ts .gate1/dev01b/index.ts
-          deno cache .gate1/runtime/fixtures.ts .gate1/runtime/submit_api.ts .gate1/dev01b/index.ts
+          deno check .gate1/runtime/fixtures.ts .gate1/runtime/submit_api.ts .gate1/runtime/windows.ts .gate1/dev01b/index.ts
+          deno cache .gate1/runtime/fixtures.ts .gate1/runtime/submit_api.ts .gate1/runtime/windows.ts .gate1/dev01b/index.ts .gate1/dev01b/retired.ts
       - name: Real Auth Storage original Edge input authorization retry tests
         shell: bash
         run: |
           set -euo pipefail
           deno run --cached-only --no-prompt --deny-net=rfwqcrvxyjhtmafnbuyy.supabase.co --allow-net=127.0.0.1,localhost --allow-env --allow-read=.gate1 --allow-write=.gate1-artifacts,.gate1/local-stack .gate1/runtime/fixtures.ts prepare |& tee .gate1-artifacts/original-edge-fixtures.log
           python3 .gate1/runtime/prepare_local.py fixture-env
+          deno run --cached-only --no-prompt --deny-net=rfwqcrvxyjhtmafnbuyy.supabase.co --allow-net=127.0.0.1,localhost --allow-env --allow-read=.gate1 --allow-write=.gate1-artifacts,.gate1/local-stack .gate1/runtime/windows.ts creation |& tee .gate1-artifacts/window-creation.log
+          deno run --cached-only --no-prompt --deny-net=rfwqcrvxyjhtmafnbuyy.supabase.co --allow-net=127.0.0.1,localhost --allow-env --allow-read=.gate1 --allow-write=.gate1-artifacts,.gate1/local-stack .gate1/runtime/windows.ts cleanup |& tee .gate1-artifacts/window-cleanup.log
+          deno run --cached-only --no-prompt --deny-net=rfwqcrvxyjhtmafnbuyy.supabase.co --allow-net=127.0.0.1,localhost --allow-env --allow-read=.gate1 --allow-write=.gate1-artifacts,.gate1/local-stack .gate1/runtime/windows.ts retired |& tee .gate1-artifacts/window-retired.log
       - name: Execute transaction assertions against actual local Auth Storage fixtures
         shell: bash
         run: |
@@ -393,3 +397,24 @@ jobs:
       - name: Destroy local containers and volumes
         if: always()
         run: supabase stop --workdir .gate1/local-stack --no-backup
+
+  gate1-result:
+    if: always() && github.ref == 'refs/heads/test/dev01b-v5-gate1-20261108'
+    needs: [isolated-pg17, v5-pg17-migration, deno-runtime, v5-transaction-rls, local-supabase-api]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: gate1-*
+          path: .gate1-evidence
+      - name: Require all jobs and machine-readable assertions before declaring PASS
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .gate1/tests/report_gate.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gate1-final-report
+          path: .gate1-final/

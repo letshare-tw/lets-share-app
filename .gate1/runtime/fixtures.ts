@@ -9,6 +9,13 @@ if(phase==='prepare'){
  const privateState={adminId:created.data.user!.id,adminToken:login.data.session!.access_token,proof:crypto.randomUUID()+crypto.randomUUID(),createUntil:new Date(Date.now()+20*60000).toISOString(),cleanupUntil:new Date(Date.now()+40*60000).toISOString()};
  await Deno.writeTextFile('.gate1/local-stack/runtime.private.json',JSON.stringify(privateState));
  const {invoke,redirects}=await installFixtureRunner();
+ const outsiderPassword=crypto.randomUUID()+'aA9!';
+ const outsider=await admin.auth.admin.createUser({email:'gate1-outsider@example.invalid',password:outsiderPassword,email_confirm:true});
+ check('synthetic non-admin created',!outsider.error&&!!outsider.data.user,outsider.error);
+ const outsiderClient=member();const outsiderLogin=await outsiderClient.auth.signInWithPassword({email:'gate1-outsider@example.invalid',password:outsiderPassword});
+ check('real JWT not on admin allowlist rejected',(await invoke('status',{}, {authorization:'Bearer '+outsiderLogin.data.session!.access_token})).status===422);
+ const outsiderLogout=await outsiderClient.auth.signOut({scope:'global'});check('outsider session revoked',!outsiderLogout.error);
+ const outsiderDelete=await admin.auth.admin.deleteUser(outsider.data.user!.id);check('outsider fixture removed',!outsiderDelete.error);
  check('original handler rejects GET',(await invoke('status',{}, {},undefined,'GET')).status===405);
  check('missing JWT rejected',(await invoke('status',{}, {authorization:''})).status===422);
  check('forged JWT rejected',(await invoke('status',{}, {authorization:'Bearer forged.jwt.value'})).status===422);
@@ -33,6 +40,15 @@ if(phase==='prepare'){
  await writeReport('original-edge-fixtures',{scope:'Original index.ts handler; real loopback Auth, Storage, PostgREST; no deployed remote Edge runtime'});
 }else if(phase==='cleanup'){
  const {invoke,state}=await installFixtureRunner();
+ const manifest=JSON.parse(await Deno.readTextFile('.gate1-artifacts/local-fixture-manifest.json'));
+ const unknown=manifest.a.id+'/'+manifest.a.request_id+'/9999999999999-unknown.png';
+ const extra=await admin.storage.from('share-placement-photos').upload(unknown,new Uint8Array([1,2,3]),{contentType:'image/png'});
+ check('unknown-object safety fixture created locally',!extra.error,extra.error);
+ const refused=await invoke('cleanup');check('original cleanup refuses unknown Storage object',refused.status===422,refused);
+ for(const name of [manifest.a.photo_path,manifest.b.photo_path,unknown]){
+  const exists=await admin.storage.from('share-placement-photos').info(name);check('refused cleanup preserves object '+name,!exists.error&&!!exists.data,exists.error);
+ }
+ const extraRemoved=await admin.storage.from('share-placement-photos').remove([unknown]);check('operator removes only known injected object',!extraRemoved.error,extraRemoved.error);
  const cleaned=await invoke('cleanup');check('original cleanup endpoint succeeds after SQL draft cleanup',cleaned.status===200&&cleaned.body.clean===true,cleaned);
  const ledger=await admin.rpc('dev01b_v5_ledger',{p_run:RUN});check('durable manifest readable after Auth deletion',!ledger.error,ledger.error);
  // The original cleanup never deletes DB drafts. The SQL operator cleaned
