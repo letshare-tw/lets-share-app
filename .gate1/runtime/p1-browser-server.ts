@@ -20,7 +20,7 @@ const activated=await client.rpc('lx_activate_share_service',{p_agreement_versio
 check('browser fixture service activation',!activated.error,activated.error);
 const point=await admin.from('lx_approved_collection_points').insert({name:'P1 LOCAL TEST POINT',address_text:'臺南市本機測試路123號',enabled:true,approved_at:published}).select('id').single();
 check('browser fixture approved collection point',!point.error&&!!point.data,point.error);
-const handler=submissionHandler(member(),admin);
+const handler=submissionHandler(member(),admin,'lx_edge_submit_share_request');
 let requestId='',photoPath='',bagId='',completed=false;
 const hostname='127.0.0.1',port=8765;
 const mime=(p:string)=>p.endsWith('.js')?'text/javascript; charset=utf-8':'text/html; charset=utf-8';
