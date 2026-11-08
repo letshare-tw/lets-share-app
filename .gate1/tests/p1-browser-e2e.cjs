@@ -92,6 +92,13 @@ const {chromium}=require('playwright');
   const badJwt=await post('not.a.valid.jwt');
   if(badJwt.status!==401)throw Error('Edge invalid JWT must reject: '+JSON.stringify(badJwt));
   console.log('PASS actual Edge entry rejects invalid JWT');
+  // A member JWT must never execute the privileged adapter through PostgREST.
+  const direct=await fetch('http://127.0.0.1:8765/rest/v1/rpc/lx_edge_submit_share_request',{
+   method:'POST',headers:{'Content-Type':'application/json',apikey:fixture.key,Authorization:'Bearer '+fixture.token},
+   body:JSON.stringify({p_user:fixture.uid,p_request:body.request_id,p_version:fixture.version,p_transfer:true,p_no_return:true,p_recycling:true})
+  });
+  if(direct.ok)throw Error('SECURITY: authenticated member executed service-only RPC');
+  console.log('PASS authenticated member cannot invoke service-only RPC',direct.status);
   const foreign=await post(fixture.otherToken);
   if(foreign.status!==404)throw Error('Edge cross-user request must reject: '+JSON.stringify(foreign));
   console.log('PASS actual Edge entry rejects cross-account request');
