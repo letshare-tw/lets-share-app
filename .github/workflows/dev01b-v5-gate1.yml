@@ -126,7 +126,7 @@ jobs:
               )) THEN RAISE EXCEPTION 'hardened search_path missing: %',fn.proname; END IF;
               IF has_function_privilege('anon',fn.oid,'EXECUTE')
                  OR has_function_privilege('authenticated',fn.oid,'EXECUTE')
-                 OR has_function_privilege('public',fn.oid,'EXECUTE') THEN
+                 OR EXISTS (SELECT 1 FROM pg_proc p, unnest(p.proacl) a WHERE p.oid=fn.oid AND a::text LIKE '=%') THEN
                 RAISE EXCEPTION 'unauthorized EXECUTE: %',fn.proname;
               END IF;
               IF NOT has_function_privilege('service_role',fn.oid,'EXECUTE') THEN
