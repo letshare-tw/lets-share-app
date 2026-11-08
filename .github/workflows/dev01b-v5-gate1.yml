@@ -122,7 +122,7 @@ jobs:
               END IF;
               IF NOT (SELECT EXISTS(
                 SELECT 1 FROM unnest((SELECT proconfig FROM pg_proc WHERE oid=fn.oid)) setting
-                WHERE setting='search_path='
+                WHERE setting IN ('search_path=','search_path=""')
               )) THEN RAISE EXCEPTION 'hardened search_path missing: %',fn.proname; END IF;
               IF has_function_privilege('anon',fn.oid,'EXECUTE')
                  OR has_function_privilege('authenticated',fn.oid,'EXECUTE')
