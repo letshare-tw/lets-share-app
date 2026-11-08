@@ -51,8 +51,6 @@ BEGIN
  v_check := public.lx_share_submission_preflight(p_request_id);
  IF (v_check->>'ready') IS DISTINCT FROM 'true'
  THEN RAISE EXCEPTION '分享資料尚未完成：%',coalesce(v_check->>'reason','請檢查資料'); END IF;
- SELECT * INTO STRICT v_details FROM public.lx_share_draft_details
- WHERE request_id=p_request_id AND user_id=v_uid;
  -- Lock the details row so its location and photo cannot change during submission.
  SELECT * INTO STRICT v_details FROM public.lx_share_draft_details
  WHERE request_id=p_request_id AND user_id=v_uid FOR UPDATE;
