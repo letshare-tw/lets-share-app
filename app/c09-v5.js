@@ -12,6 +12,8 @@ const CONFIG=Object.freeze({
 });
 const $=id=>document.getElementById(id);
 const state={token:'',uid:'',draft:'',address:'',points:[],photo:'',version:'',busy:false,ready:false};
+const PHOTO_MAX_BYTES=300*1024;
+const PHOTO_MAX_EDGE=1280;
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const note=(message)=>{$('status').textContent=message;};
 const setBusy=(busy)=>{state.busy=busy;$('save').disabled=busy;$('preflight').disabled=busy||!state.draft;$('submit').disabled=busy||!state.ready||!CONFIG.submitEndpoint;};
@@ -37,9 +39,30 @@ function validate(){
  if(kind()==='home'&&!state.address.trim())throw Error('請先設定住家地址');
  if(kind()==='collection_point'&&!$('pointSelect').value)throw Error('請選擇核准集貨點');
  const file=$('photo').files[0];
- if(!file||!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>10485760||file.size===0)throw Error('照片需為 JPG、PNG、WEBP 且不超過 10 MB');
+ if(!file||!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size===0)throw Error('照片需為有效的 JPG、PNG 或 WEBP');
  if(!$('placed').checked)throw Error('請確認分享袋已放妥');
  return {count,file};
+}
+async function compressPhoto(file){
+ // Never upload an original photo. Decode and encode as WebP, resizing to <=1280 px.
+ const image=await createImageBitmap(file).catch(()=>{throw Error('照片無法解碼，請重新拍攝');});
+ try{
+  const ratio=Math.min(1,PHOTO_MAX_EDGE/Math.max(image.width,image.height));
+  let width=Math.max(1,Math.round(image.width*ratio));
+  let height=Math.max(1,Math.round(image.height*ratio));
+  for(let scale=0;scale<5;scale++){
+   const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+   const ctx=canvas.getContext('2d');if(!ctx)throw Error('手機不支援照片壓縮');
+   ctx.drawImage(image,0,0,width,height);
+   for(const quality of [0.8,0.72,0.62,0.5,0.38]){
+    const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/webp',quality));
+    if(!blob||blob.type!=='image/webp')throw Error('手機不支援 WebP 壓縮，請使用更新的瀏覽器');
+    if(blob.size>0&&blob.size<=PHOTO_MAX_BYTES)return blob;
+   }
+   width=Math.max(1,Math.round(width*0.8));height=Math.max(1,Math.round(height*0.8));
+  }
+  throw Error('照片壓縮後仍超過 300 KB，請重新拍攝較簡單的畫面');
+ }finally{image.close();}
 }
 async function upload(file,path){
  const r=await fetch(CONFIG.base+'/storage/v1/object/'+CONFIG.bucket+'/'+path,{method:'POST',
@@ -51,11 +74,13 @@ async function save(){
  try{
   const {count,file}=validate();setBusy(true);state.ready=false;state.version='';$('agreement').classList.add('hidden');
   if(!state.draft){note('建立分享草稿…');const id=await request('rpc/lx_create_share_draft',{});if(!uuid.test(id))throw Error('草稿編號無效');state.draft=id;}
+  note('正在將照片壓縮至 300 KB 以下…');
+  const compressed=await compressPhoto(file);
   // V5 storage policy requires owner/draft/timestamp-random.ext.
-  if(!state.photo){const ext={ 'image/jpeg':'jpg','image/png':'png','image/webp':'webp'}[file.type];
+  if(!state.photo){const ext='webp';
    const rand=crypto.randomUUID().replaceAll('-','').slice(0,8);
    state.photo=state.uid+'/'+state.draft+'/'+Date.now()+'-'+rand+'.'+ext;
-   note('上傳照片…');try{await upload(file,state.photo);}catch(e){state.photo='';throw e;}
+   note('上傳照片…');try{await upload(compressed,state.photo);}catch(e){state.photo='';throw e;}
   }
   const point=state.points.find(p=>p.id===$('pointSelect').value);
   const details={request_id:state.draft,user_id:state.uid,clothing_count:count,pickup_kind:kind(),
