@@ -98,11 +98,7 @@ jobs:
         run: |
           set -euo pipefail
           deno --version | tee deno-version.txt
-          if [ ! -f .gate1/dev01b/index.ts ]; then
-            echo 'BLOCKED: original DEV-01B index.ts not yet present in test branch' | tee deno-result.txt
-            exit 2
-          fi
-          deno check .gate1/dev01b/index.ts |& tee deno-result.txt
+          deno check .gate1/dev01b/index.ts .gate1/dev01b/retired.ts |& tee deno-result.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
