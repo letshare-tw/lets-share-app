@@ -9,6 +9,7 @@ ALTER TABLE public.lx_share_bags
 CREATE SEQUENCE IF NOT EXISTS public.lx_share_bag_code_seq;
 REVOKE ALL ON SEQUENCE public.lx_share_bag_code_seq FROM PUBLIC, anon, authenticated;
 -- 3. Preserve the five-argument RPC contract and UUID return value.
+-- DEV-01C MUST add a stable delivery-task/bag association before dispatch.
 CREATE OR REPLACE FUNCTION public.lx_submit_share_request(
  p_request_id uuid, p_agreement_version text,
  p_transfer_agreed boolean, p_no_return_agreed boolean, p_recycling_agreed boolean
@@ -22,6 +23,7 @@ DECLARE
  v_result uuid;
  v_details public.lx_share_draft_details%ROWTYPE;
  v_declared_at timestamptz;
+ v_pickup_location text;
  v_code text;
 BEGIN
  IF v_uid IS NULL THEN RAISE EXCEPTION '請先登入會員'; END IF;
@@ -51,6 +53,16 @@ BEGIN
  THEN RAISE EXCEPTION '分享資料尚未完成：%',coalesce(v_check->>'reason','請檢查資料'); END IF;
  SELECT * INTO STRICT v_details FROM public.lx_share_draft_details
  WHERE request_id=p_request_id AND user_id=v_uid;
+ -- Lock the details row so its location and photo cannot change during submission.
+ SELECT * INTO STRICT v_details FROM public.lx_share_draft_details
+ WHERE request_id=p_request_id AND user_id=v_uid FOR UPDATE;
+ IF v_details.pickup_kind='collection_point' THEN
+  SELECT p.address_text INTO v_pickup_location FROM public.lx_approved_collection_points p
+  WHERE p.id=v_details.collection_point_id AND p.enabled AND p.approved_at IS NOT NULL;
+ ELSE
+  v_pickup_location:=v_details.pickup_address_snapshot;
+ END IF;
+ IF nullif(btrim(v_pickup_location),'') IS NULL THEN RAISE EXCEPTION '取件地址不完整'; END IF;
  v_declared_at := clock_timestamp();
  UPDATE public.lx_share_requests SET status='submitted',
   transfer_agreement_version=v_settings.agreement_version,
@@ -60,12 +72,12 @@ BEGIN
  RETURNING id INTO v_result;
  IF v_result IS NULL THEN RAISE EXCEPTION '分享申請已處理，請勿重複提交'; END IF;
  v_code := 'LS-'||to_char(v_declared_at AT TIME ZONE 'Asia/Taipei','YYMMDD')
-  ||'-'||lpad(nextval('public.lx_share_bag_code_seq'::regclass)::text,6,'0');
+  ||'-'||(SELECT CASE WHEN length(n::text)<6 THEN lpad(n::text,6,'0') ELSE n::text END FROM (SELECT nextval('public.lx_share_bag_code_seq'::regclass) AS n) q);
  INSERT INTO public.lx_share_bags(
   share_request_id,bag_code,status,pickup_location,declared_at,pickup_deadline_at,
   pickup_kind,collection_point_id,placement_note,placement_photo_path,placement_confirmed_at
  ) VALUES(
-  p_request_id,v_code,'pending_pickup',v_details.pickup_address_snapshot,
+  p_request_id,v_code,'pending_pickup',v_pickup_location,
   v_declared_at,v_declared_at+interval '48 hours',
   v_details.pickup_kind,v_details.collection_point_id,
   v_details.placement_note,v_details.placement_photo_path,v_declared_at
