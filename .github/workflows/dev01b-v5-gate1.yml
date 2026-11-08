@@ -408,6 +408,18 @@ jobs:
         if: always()
         run: supabase stop --workdir .gate1/local-stack --no-backup
 
+  p1-fix-c09-v5:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify isolated C09 V5 browser contract
+        run: python3 .gate1/tests/p1-fix-contract.py
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check browser module syntax
+        run: deno check app/c09-v5.js
+
   gate1-result:
     if: always() && github.ref == 'refs/heads/test/dev01b-v5-gate1-20261108'
     needs: [isolated-pg17, v5-pg17-migration, deno-runtime, v5-transaction-rls, local-supabase-api]
