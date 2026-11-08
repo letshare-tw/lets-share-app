@@ -367,7 +367,7 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f .gate1/runtime/edge-submit-candidate.sql
           psql -X -v ON_ERROR_STOP=1 -f .gate1/runtime/local-ledger-fixture.sql
           psql -X -v ON_ERROR_STOP=1 -c "NOTIFY pgrst, 'reload schema';"
-          deno check .gate1/runtime/fixtures.ts .gate1/runtime/submit_api.ts .gate1/runtime/windows.ts .gate1/dev01b/index.ts
+          deno check .gate1/runtime/fixtures.ts .gate1/runtime/submit_api.ts .gate1/runtime/windows.ts .gate1/dev01b/index.ts .gate1/runtime/edge-submit-handler.ts supabase/functions/share-submit/index.ts
           deno cache .gate1/runtime/fixtures.ts .gate1/runtime/submit_api.ts .gate1/runtime/windows.ts .gate1/dev01b/index.ts .gate1/dev01b/retired.ts
       - name: Real Auth Storage original Edge input authorization retry tests
         shell: bash
