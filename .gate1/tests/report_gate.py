@@ -30,7 +30,7 @@ if not failures:
   assert any(x['name']=='authenticated is neither owner superuser nor bypassrls' and x['role_name']=='authenticated' for x in actual)
   matrix.extend({**x,'suite':'restricted-role-pg17','status':'PASS'} for x in actual)
   assert 'PASS: fresh-connection postflight' in (db/'postflight-strict.log').read_text()
-  assert 'PASS: scoped original cleanup' in (db/'cleanup.log').read_text()
+  assert 'PASS: scoped original cleanup' in (db/'cleanup-assert.log').read_text(), 'Missing actual cleanup assertion evidence'
   api=root/'gate1-local-supabase-api'
   reports=['original-edge-fixtures','original-edge-cleanup','original-window-creation','original-window-cleanup','original-retired','submit-http-api']
   for name in reports:
@@ -97,4 +97,6 @@ if failures:report+='\n## Failures\n\n'+'\n'.join('- '+x for x in failures)+'\n'
 (out/'GATE1-RESULTS.md').write_text(report)
 (out/'GATE1-REMAINING-RISKS.md').write_text(Path('.gate1/GATE1-REMAINING-RISKS.md').read_text())
 print(decision, len(matrix), 'assertions')
-if failures:sys.exit(1)
+if failures:
+ print(json.dumps(failures))
+ sys.exit(1)

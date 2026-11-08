@@ -310,7 +310,7 @@ jobs:
           set -euo pipefail
           source .gate1/tests/fixture-env.sh
           psql -X -v ON_ERROR_STOP=1 -v a_uid="$a_uid" -v b_uid="$b_uid" -v a_request="$a_request" -v b_request="$b_request" -f .gate1/dev01b/cleanup_drafts.psql |& tee .gate1-artifacts/cleanup.log
-          psql -X -v ON_ERROR_STOP=1 -f .gate1/tests/cleanup-assert.sql
+          psql -X -v ON_ERROR_STOP=1 -f .gate1/tests/cleanup-assert.sql |& tee .gate1-artifacts/cleanup-assert.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
