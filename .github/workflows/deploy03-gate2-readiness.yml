@@ -35,6 +35,25 @@ jobs:
           name: gate2-local-browser-evidence
           path: gate2-browser-runtime.log
           if-no-files-found: warn
+  gate2-preview-package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and verify deterministic offline preview package (no deployment)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .gate1/tests/gate2-preview-package.py | tee gate2-preview-package.log
+          python3 .gate1/tests/gate2-preview-package.py --output .gate2-out/second.zip | tee -a gate2-preview-package.log
+          cmp .gate2-out/lets-share-c09-v5-offline-preview.zip .gate2-out/second.zip
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: gate2-offline-preview-package
+          path: |
+            .gate2-out/lets-share-c09-v5-offline-preview.zip
+            gate2-preview-package.log
+          if-no-files-found: error
   gate2-deploy-rehearsal:
     runs-on: ubuntu-24.04
     steps:
@@ -78,7 +97,7 @@ jobs:
           if-no-files-found: warn
   gate2-result:
     if: always() && github.ref == 'refs/heads/test/dev01b-v5-gate1-20261108'
-    needs: [gate2-offline-readiness, gate2-local-browser-runtime, gate2-deploy-rehearsal]
+    needs: [gate2-offline-readiness, gate2-local-browser-runtime, gate2-deploy-rehearsal, gate2-preview-package]
     runs-on: ubuntu-24.04
     steps:
       - name: Require both Gate 2 jobs to pass
@@ -87,11 +106,12 @@ jobs:
           READINESS_RESULT: ${{ needs.gate2-offline-readiness.result }}
           BROWSER_RESULT: ${{ needs.gate2-local-browser-runtime.result }}
           DEPLOY_RESULT: ${{ needs.gate2-deploy-rehearsal.result }}
+          PACKAGE_RESULT: ${{ needs.gate2-preview-package.result }}
         shell: bash
         run: |
           set -euo pipefail
-          echo "Gate 2 readiness: $READINESS_RESULT; Chromium: $BROWSER_RESULT; Local deployment: $DEPLOY_RESULT"
-          [[ "$READINESS_RESULT" == success && "$BROWSER_RESULT" == success && "$DEPLOY_RESULT" == success ]]
+          echo "Gate 2 readiness: $READINESS_RESULT; Chromium: $BROWSER_RESULT; Local deployment: $DEPLOY_RESULT; Preview package: $PACKAGE_RESULT"
+          [[ "$READINESS_RESULT" == success && "$BROWSER_RESULT" == success && "$DEPLOY_RESULT" == success && "$PACKAGE_RESULT" == success ]]
       - name: Publish aggregated Gate 2 run URL and verdict
         if: always()
         continue-on-error: true
@@ -103,10 +123,11 @@ jobs:
           READINESS_RESULT: ${{ needs.gate2-offline-readiness.result }}
           BROWSER_RESULT: ${{ needs.gate2-local-browser-runtime.result }}
           DEPLOY_RESULT: ${{ needs.gate2-deploy-rehearsal.result }}
+          PACKAGE_RESULT: ${{ needs.gate2-preview-package.result }}
         shell: bash
         run: |
           set -euo pipefail
           state=failure
-          if [[ "$READINESS_RESULT" == success && "$BROWSER_RESULT" == success && "$DEPLOY_RESULT" == success ]]; then state=success; fi
-          jq -n --arg state "$state" --arg target_url "https://github.com/$GH_REPOSITORY/actions/runs/$GH_RUN_ID" '{state:$state,target_url:$target_url,description:"Gate 2 readiness + Chromium + loopback rollback; no hosted deployment",context:"DEPLOY-03/Gate-2-Readiness"}' > /tmp/gate2-status.json
+          if [[ "$READINESS_RESULT" == success && "$BROWSER_RESULT" == success && "$DEPLOY_RESULT" == success && "$PACKAGE_RESULT" == success ]]; then state=success; fi
+          jq -n --arg state "$state" --arg target_url "https://github.com/$GH_REPOSITORY/actions/runs/$GH_RUN_ID" '{state:$state,target_url:$target_url,description:"Gate 2 offline readiness + Chromium + rollback + preview package",context:"DEPLOY-03/Gate-2-Readiness"}' > /tmp/gate2-status.json
           curl --fail-with-body --silent --show-error --retry 3 -X POST -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'Content-Type: application/json' --data-binary @/tmp/gate2-status.json "https://api.github.com/repos/$GH_REPOSITORY/statuses/$GH_SHA"
