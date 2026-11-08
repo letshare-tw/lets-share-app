@@ -51,7 +51,7 @@ const {chromium}=require('playwright');
    const original=Buffer.from(input.base64,'base64');
    await page.locator('#photo').setInputFiles({name:'sample.'+f.mime.split('/')[1],mimeType:f.mime,buffer:original});
    const result=await page.evaluate(async()=>{
-    const compressed=await compressPhoto(document.querySelector('#photo').files[0]);
+    const compressed=await globalThis.__P1_COMPRESS_PHOTO__(document.querySelector('#photo').files[0]);
     const bitmap=await createImageBitmap(compressed);
     const value={mime:compressed.type,size:compressed.size,width:bitmap.width,height:bitmap.height};
     bitmap.close();return value;
