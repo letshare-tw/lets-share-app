@@ -4,13 +4,15 @@ const {chromium}=require('playwright');
  try{
   const fixture=await (await fetch('http://127.0.0.1:8765/__fixture')).json();
   const page=await browser.newPage();
+  page.on('pageerror',e=>console.error('BROWSER_JS_ERROR',e.message));
+  page.on('console',m=>{if(m.type()==='error')console.error('BROWSER_CONSOLE_ERROR',m.text());});
   let photoPath='';page.on('request',r=>{if(r.url().includes('/storage/v1/object/share-placement-photos/'))photoPath=decodeURIComponent(r.url().split('/storage/v1/object/share-placement-photos/')[1]);});
   await page.addInitScript(f=>{
    globalThis.__P1_LOCAL_TEST_CONFIG__={base:'http://127.0.0.1:8765',key:f.key,submitEndpoint:'http://127.0.0.1:8765/submit'};
    sessionStorage.setItem('lx_supabase_auth_v066g',JSON.stringify({token:f.token}));
   },fixture);
   await page.goto('http://127.0.0.1:8765/c09-v5.html');
-  await page.waitForFunction(()=>document.querySelector('#identity')?.textContent?.includes('已登入'));
+  await page.waitForFunction(()=>document.querySelector('#identity')?.textContent?.includes('已登入'),null,{timeout:10000}).catch(async e=>{console.error('IDENTITY_DEBUG',await page.locator('#identity').innerText(),'STATUS_DEBUG',await page.locator('#status').innerText());throw e;});
   await page.locator('input[name="kind"][value="collection_point"]').check();
   await page.waitForFunction(()=>document.querySelector('#pointSelect')?.options.length>1,null,{timeout:20000});
   await page.locator('#pointSelect').selectOption({index:1});
