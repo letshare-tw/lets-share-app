@@ -39,3 +39,4 @@ END $$;
 COMMIT;
 -- psql -X -v ON_ERROR_STOP=1 -v a_uid=... -v b_uid=... -v a_request=... -v b_request=... -f cleanup_drafts.psql
 -- WARNING: run only after explicitly authorized cleanup; verify postflight and transaction exit code.
+
