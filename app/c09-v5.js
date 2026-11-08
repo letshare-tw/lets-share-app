@@ -64,6 +64,7 @@ async function compressPhoto(file){
   throw Error('照片壓縮後仍超過 300 KB，請重新拍攝較簡單的畫面');
  }finally{image.close();}
 }
+if(loopback)globalThis.__P1_COMPRESS_PHOTO__=compressPhoto;
 async function upload(file,path){
  const r=await fetch(CONFIG.base+'/storage/v1/object/'+CONFIG.bucket+'/'+path,{method:'POST',
  headers:{apikey:CONFIG.key,Authorization:'Bearer '+state.token,'Content-Type':file.type,'x-upsert':'false'},body:file});
