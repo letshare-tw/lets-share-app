@@ -35,6 +35,21 @@ jobs:
           name: gate2-local-browser-evidence
           path: gate2-browser-runtime.log
           if-no-files-found: warn
+  gate2-deploy-rehearsal:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stage HTTP site on loopback and prove exact rollback
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .gate1/tests/gate2-deploy-rehearsal.py | tee gate2-deploy-rehearsal.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gate2-deploy-rehearsal-evidence
+          path: gate2-deploy-rehearsal.log
+          if-no-files-found: warn
   gate2-offline-readiness:
     runs-on: ubuntu-24.04
     steps:
@@ -63,7 +78,7 @@ jobs:
           if-no-files-found: warn
   gate2-result:
     if: always() && github.ref == 'refs/heads/test/dev01b-v5-gate1-20261108'
-    needs: [gate2-offline-readiness, gate2-local-browser-runtime]
+    needs: [gate2-offline-readiness, gate2-local-browser-runtime, gate2-deploy-rehearsal]
     runs-on: ubuntu-24.04
     steps:
       - name: Require both Gate 2 jobs to pass
@@ -71,11 +86,12 @@ jobs:
         env:
           READINESS_RESULT: ${{ needs.gate2-offline-readiness.result }}
           BROWSER_RESULT: ${{ needs.gate2-local-browser-runtime.result }}
+          DEPLOY_RESULT: ${{ needs.gate2-deploy-rehearsal.result }}
         shell: bash
         run: |
           set -euo pipefail
-          echo "Gate 2 readiness: $READINESS_RESULT; Chromium: $BROWSER_RESULT"
-          [[ "$READINESS_RESULT" == success && "$BROWSER_RESULT" == success ]]
+          echo "Gate 2 readiness: $READINESS_RESULT; Chromium: $BROWSER_RESULT; Local deployment: $DEPLOY_RESULT"
+          [[ "$READINESS_RESULT" == success && "$BROWSER_RESULT" == success && "$DEPLOY_RESULT" == success ]]
       - name: Publish aggregated Gate 2 run URL and verdict
         if: always()
         continue-on-error: true
@@ -86,10 +102,11 @@ jobs:
           GH_RUN_ID: ${{ github.run_id }}
           READINESS_RESULT: ${{ needs.gate2-offline-readiness.result }}
           BROWSER_RESULT: ${{ needs.gate2-local-browser-runtime.result }}
+          DEPLOY_RESULT: ${{ needs.gate2-deploy-rehearsal.result }}
         shell: bash
         run: |
           set -euo pipefail
           state=failure
-          if [[ "$READINESS_RESULT" == success && "$BROWSER_RESULT" == success ]]; then state=success; fi
-          jq -n --arg state "$state" --arg target_url "https://github.com/$GH_REPOSITORY/actions/runs/$GH_RUN_ID" '{state:$state,target_url:$target_url,description:"Gate 2 offline readiness + isolated Chromium; no hosted deployment",context:"DEPLOY-03/Gate-2-Readiness"}' > /tmp/gate2-status.json
+          if [[ "$READINESS_RESULT" == success && "$BROWSER_RESULT" == success && "$DEPLOY_RESULT" == success ]]; then state=success; fi
+          jq -n --arg state "$state" --arg target_url "https://github.com/$GH_REPOSITORY/actions/runs/$GH_RUN_ID" '{state:$state,target_url:$target_url,description:"Gate 2 readiness + Chromium + loopback rollback; no hosted deployment",context:"DEPLOY-03/Gate-2-Readiness"}' > /tmp/gate2-status.json
           curl --fail-with-body --silent --show-error --retry 3 -X POST -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'Content-Type: application/json' --data-binary @/tmp/gate2-status.json "https://api.github.com/repos/$GH_REPOSITORY/statuses/$GH_SHA"
