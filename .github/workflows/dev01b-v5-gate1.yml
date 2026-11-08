@@ -397,6 +397,25 @@ jobs:
           set -euo pipefail
           deno run --cached-only --no-prompt --deny-net=rfwqcrvxyjhtmafnbuyy.supabase.co --allow-net=127.0.0.1,localhost --allow-env --allow-read=.gate1,.gate1-artifacts/local-fixture-manifest.json --allow-write=.gate1-artifacts,.gate1/local-stack .gate1/runtime/submit_api.ts |& tee .gate1-artifacts/submit-http-api.log
           psql -X -v ON_ERROR_STOP=1 -f .gate1/runtime/local-postflight.sql |& tee .gate1-artifacts/local-final-postflight.log
+      - name: Real Chromium C09 V5 end-to-end on isolated local Supabase
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save playwright@1.58.2
+          npx playwright install --with-deps chromium
+          deno run --cached-only --no-prompt --allow-net=127.0.0.1,localhost --allow-env --allow-read=.gate1,app --allow-write=.gate1-artifacts .gate1/runtime/p1-browser-server.ts > .gate1-artifacts/p1-browser-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8765/__fixture > /dev/null; then ready=1; break; fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then break; fi
+            sleep 1
+          done
+          if [ "$ready" != 1 ]; then cat .gate1-artifacts/p1-browser-server.log; exit 1; fi
+          node .gate1/tests/p1-browser-e2e.cjs |& tee .gate1-artifacts/p1-browser-e2e.log
+          wait "$server_pid"
+          cat .gate1-artifacts/p1-browser-server.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
