@@ -460,7 +460,7 @@ jobs:
 
   gate1-result:
     if: always() && github.ref == 'refs/heads/test/dev01b-v5-gate1-20261108'
-    needs: [isolated-pg17, v5-pg17-migration, deno-runtime, v5-transaction-rls, local-supabase-api]
+    needs: [isolated-pg17, v5-pg17-migration, deno-runtime, v5-transaction-rls, local-supabase-api, p1-fix-c09-v5]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
