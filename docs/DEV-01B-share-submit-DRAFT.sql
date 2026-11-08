@@ -48,18 +48,20 @@ BEGIN
   WHERE c.user_id=v_uid AND c.agreement_version=v_settings.agreement_version
     AND a.published_at IS NOT NULL AND a.published_at<=now()
  ) THEN RAISE EXCEPTION '請先啟用分享服務並同意目前版本的協議'; END IF;
+ -- Lock details before preflight to prevent changes between validation and snapshot.
+ SELECT * INTO STRICT v_details FROM public.lx_share_draft_details
+ WHERE request_id=p_request_id AND user_id=v_uid FOR UPDATE;
  v_check := public.lx_share_submission_preflight(p_request_id);
  IF (v_check->>'ready') IS DISTINCT FROM 'true'
  THEN RAISE EXCEPTION '分享資料尚未完成：%',coalesce(v_check->>'reason','請檢查資料'); END IF;
- -- Lock the details row so its location and photo cannot change during submission.
- SELECT * INTO STRICT v_details FROM public.lx_share_draft_details
- WHERE request_id=p_request_id AND user_id=v_uid FOR UPDATE;
  IF v_details.pickup_kind='collection_point' THEN
   SELECT p.address_text INTO v_pickup_location FROM public.lx_approved_collection_points p
-  WHERE p.id=v_details.collection_point_id AND p.enabled AND p.approved_at IS NOT NULL;
+  WHERE p.id=v_details.collection_point_id AND p.enabled AND p.approved_at IS NOT NULL
+ FOR SHARE;
  ELSE
   v_pickup_location:=v_details.pickup_address_snapshot;
  END IF;
+ IF v_details.pickup_kind NOT IN ('home','collection_point') OR v_details.pickup_kind IS NULL THEN RAISE EXCEPTION '取件類型不正確'; END IF;
  IF nullif(btrim(v_pickup_location),'') IS NULL THEN RAISE EXCEPTION '取件地址不完整'; END IF;
  v_declared_at := clock_timestamp();
  UPDATE public.lx_share_requests SET status='submitted',
