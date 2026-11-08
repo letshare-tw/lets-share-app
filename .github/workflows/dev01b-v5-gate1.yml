@@ -275,12 +275,13 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f .gate1/tests/compatibility-fix.sql
           psql -X -v ON_ERROR_STOP=1 -f .gate1/tests/assertions.sql
           psql -X -v ON_ERROR_STOP=1 -f .gate1/tests/fixtures.sql |& tee .gate1-artifacts/fixtures.log
-      - name: Execute unchanged original transaction_test.psql
+      - name: Execute original assertion matrix with reviewed transaction-time fixture fix
         shell: bash
         run: |
           set -euo pipefail
           source .gate1/tests/fixture-env.sh
-          psql -X -v ON_ERROR_STOP=1 -v a_uid="$a_uid" -v b_uid="$b_uid" -v a_request="$a_request" -v b_request="$b_request" -v a_photo="$a_photo" -v b_photo="$b_photo" -f .gate1/dev01b/transaction_test.psql |& tee .gate1-artifacts/original-transaction.log
+          python3 .gate1/tests/prepare_original_transaction.py
+          psql -X -v ON_ERROR_STOP=1 -v a_uid="$a_uid" -v b_uid="$b_uid" -v a_request="$a_request" -v b_request="$b_request" -v a_photo="$a_photo" -v b_photo="$b_photo" -f .gate1-artifacts/transaction-ci.psql |& tee .gate1-artifacts/original-transaction.log
           psql -X -v ON_ERROR_STOP=1 -f .gate1/tests/postflight-assert.psql |& tee .gate1-artifacts/postflight-original.log
       - name: Strict SQLSTATE successful submit and mid-write rollback assertions
         shell: bash
