@@ -58,6 +58,21 @@ jobs:
           END $$;
           SQL
           echo 'PASS: PostgreSQL 17 isolated transaction rollback' | tee pg-result.txt
+      - name: Apply DEV-01B V5 ledger migration and assert grants
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -f .gate1/dev01b/ledger_design.sql
+          psql -X -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname='dev01b_test') THEN RAISE EXCEPTION 'ledger schema absent'; END IF;
+            IF has_schema_privilege('authenticated','dev01b_test','USAGE') OR has_schema_privilege('anon','dev01b_test','USAGE') THEN RAISE EXCEPTION 'ledger schema exposed'; END IF;
+            IF has_function_privilege('authenticated','public.dev01b_v5_claim(text,uuid,boolean)','EXECUTE') OR has_function_privilege('anon','public.dev01b_v5_claim(text,uuid,boolean)','EXECUTE') THEN RAISE EXCEPTION 'claim exposed'; END IF;
+            IF NOT has_function_privilege('service_role','public.dev01b_v5_claim(text,uuid,boolean)','EXECUTE') THEN RAISE EXCEPTION 'service role missing grant'; END IF;
+          END $$;
+          SQL
+          echo 'PASS: V5 ledger migration and basic grants' | tee ledger-result.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -65,6 +80,7 @@ jobs:
           path: |
             pg-version.txt
             pg-result.txt
+            ledger-result.txt
   deno-runtime:
     runs-on: ubuntu-latest
     steps:
