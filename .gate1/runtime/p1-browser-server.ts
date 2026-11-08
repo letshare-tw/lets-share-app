@@ -60,8 +60,8 @@ try{
  if(requestId){if(bagId){const x=await admin.from('lx_share_bags').delete().eq('id',bagId);check('browser bag cleanup',!x.error,x.error);}const x=await admin.from('lx_share_requests').delete().eq('id',requestId);check('browser draft cleanup',!x.error,x.error);}
  if(point.data?.id){const x=await admin.from('lx_approved_collection_points').delete().eq('id',point.data.id);check('browser collection point cleanup',!x.error,x.error);}
  const closed=await admin.from('lx_share_submission_settings').update({submission_enabled:false,agreement_version:null,agreement_published_at:null}).eq('id',1);check('browser gate closed after test',!closed.error,closed.error);
- const gone=await admin.from('lx_share_agreement_versions').delete().eq('version',version);check('browser agreement cleanup',!gone.error,gone.error);
  const removed=await admin.auth.admin.deleteUser(uid);check('browser Auth cleanup',!removed.error,removed.error);
+ const gone=await admin.from('lx_share_agreement_versions').delete().eq('version',version);check('browser agreement cleanup',!gone.error,gone.error);
  await server.shutdown();
  await writeReport('p1-browser-e2e',{completed,scope:'Actual Chromium + loopback Supabase Auth/PostgREST/Storage and local Deno submissionHandler'});
 }
