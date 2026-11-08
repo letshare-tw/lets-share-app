@@ -61,7 +61,22 @@ jobs:
           name: gate2-readiness-evidence
           path: gate2-readiness.log
           if-no-files-found: warn
-      - name: Publish Gate 2 readiness run URL (not deployment approval)
+  gate2-result:
+    if: always() && github.ref == 'refs/heads/test/dev01b-v5-gate1-20261108'
+    needs: [gate2-offline-readiness, gate2-local-browser-runtime]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require both Gate 2 jobs to pass
+        id: gate
+        env:
+          READINESS_RESULT: ${{ needs.gate2-offline-readiness.result }}
+          BROWSER_RESULT: ${{ needs.gate2-local-browser-runtime.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Gate 2 readiness: $READINESS_RESULT; Chromium: $BROWSER_RESULT"
+          [[ "$READINESS_RESULT" == success && "$BROWSER_RESULT" == success ]]
+      - name: Publish aggregated Gate 2 run URL and verdict
         if: always()
         continue-on-error: true
         env:
@@ -69,10 +84,12 @@ jobs:
           GH_REPOSITORY: ${{ github.repository }}
           GH_SHA: ${{ github.sha }}
           GH_RUN_ID: ${{ github.run_id }}
-          JOB_STATUS: ${{ job.status }}
+          READINESS_RESULT: ${{ needs.gate2-offline-readiness.result }}
+          BROWSER_RESULT: ${{ needs.gate2-local-browser-runtime.result }}
+        shell: bash
         run: |
           set -euo pipefail
           state=failure
-          if [[ "$JOB_STATUS" == success ]]; then state=success; fi
-          jq -n --arg state "$state" --arg target_url "https://github.com/$GH_REPOSITORY/actions/runs/$GH_RUN_ID" '{state:$state,target_url:$target_url,description:"Gate 2 offline readiness only; no remote deployment",context:"DEPLOY-03/Gate-2-Readiness"}' > /tmp/gate2-status.json
+          if [[ "$READINESS_RESULT" == success && "$BROWSER_RESULT" == success ]]; then state=success; fi
+          jq -n --arg state "$state" --arg target_url "https://github.com/$GH_REPOSITORY/actions/runs/$GH_RUN_ID" '{state:$state,target_url:$target_url,description:"Gate 2 offline readiness + isolated Chromium; no hosted deployment",context:"DEPLOY-03/Gate-2-Readiness"}' > /tmp/gate2-status.json
           curl --fail-with-body --silent --show-error --retry 3 -X POST -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'Content-Type: application/json' --data-binary @/tmp/gate2-status.json "https://api.github.com/repos/$GH_REPOSITORY/statuses/$GH_SHA"
