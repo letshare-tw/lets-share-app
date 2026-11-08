@@ -145,6 +145,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
+          include-hidden-files: true
+          if-no-files-found: error
           name: gate1-pg17-smoke
           path: |
             pg-version.txt
@@ -207,6 +209,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
+          include-hidden-files: true
+          if-no-files-found: error
           name: gate1-v5-pg17-migration
           path: |
             v5-migration-result.txt
@@ -232,6 +236,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
+          include-hidden-files: true
+          if-no-files-found: error
           name: gate1-deno-check
           path: |
             deno-version.txt
@@ -308,6 +314,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
+          include-hidden-files: true
+          if-no-files-found: error
           name: gate1-v5-transaction-rls
           path: .gate1-artifacts/
 
@@ -392,6 +400,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
+          include-hidden-files: true
+          if-no-files-found: error
           name: gate1-local-supabase-api
           path: .gate1-artifacts/
       - name: Destroy local containers and volumes
@@ -416,5 +426,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
+          include-hidden-files: true
+          if-no-files-found: error
           name: gate1-final-report
           path: .gate1-final/
