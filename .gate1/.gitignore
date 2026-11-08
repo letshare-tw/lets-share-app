@@ -1,0 +1,4 @@
+local-stack/
+*.env
+*.private.json
+__pycache__/

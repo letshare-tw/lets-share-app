@@ -1,0 +1,44 @@
+\set ON_ERROR_STOP on
+BEGIN;
+SELECT set_config('request.jwt.claim.sub',:'a_uid',true);
+SET LOCAL ROLE authenticated;
+SELECT gate1_checks.ok('authenticated is neither owner superuser nor bypassrls',
+ current_user='authenticated' AND NOT (SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname=current_user)
+ AND (SELECT pg_get_userbyid(relowner)<>current_user FROM pg_class WHERE oid='public.profiles'::regclass));
+SELECT gate1_checks.ok('A only sees own profile',(SELECT count(*)=1 AND bool_and(id=auth.uid()) FROM public.profiles));
+SELECT gate1_checks.ok('A only sees own draft',(SELECT count(*)=1 AND bool_and(sharer_user_id=auth.uid()) FROM public.lx_share_requests));
+SELECT gate1_checks.ok('A only sees own details',(SELECT count(*)=1 AND bool_and(user_id=auth.uid()) FROM public.lx_share_draft_details));
+SELECT gate1_checks.error('member cannot self approve','UPDATE public.profiles SET registration_completed_at=now()','42501');
+SELECT gate1_checks.error('member cannot enable submission','UPDATE public.lx_share_submission_settings SET submission_enabled=true','42501');
+SELECT gate1_checks.error('member submit denied','SELECT public.lx_submit_share_request(NULL,NULL,true,true,true)','42501');
+SELECT gate1_checks.error('member legacy denied','SELECT public.lx_attach_my_draft_placement(NULL,''home'',NULL,''unused'',NULL)','42501');
+SELECT gate1_checks.error('member bootstrap denied','SELECT public.lx_test_auth_profile_bootstrap()','42501');
+SELECT gate1_checks.error('cross-owner detail insert denied',
+ format('INSERT INTO public.lx_share_draft_details(request_id,user_id) VALUES(%L,%L)',:'b_request',:'a_uid'),'42501','row-level security');
+SELECT gate1_checks.error('reassign detail user denied',format('UPDATE public.lx_share_draft_details SET user_id=%L WHERE request_id=%L',:'b_uid',:'a_request'),'42501','row-level security');
+SELECT gate1_checks.ok('A only sees own Storage object',(SELECT count(*)=1 AND bool_and(owner_id=auth.uid()::text) FROM storage.objects));
+INSERT INTO storage.objects(bucket_id,name,owner_id) VALUES('share-placement-photos',:'a_uid'||'/'||:'a_request'||'/12345679-own.png',:'a_uid');
+SELECT gate1_checks.ok('own draft upload allowed',(SELECT count(*)=2 FROM storage.objects));
+SELECT gate1_checks.error('other folder upload denied',format('INSERT INTO storage.objects(bucket_id,name) VALUES(''share-placement-photos'',%L)',:'b_uid'||'/'||:'a_request'||'/12345679-cross.png'),'42501','row-level security');
+SELECT gate1_checks.error('other request upload denied',format('INSERT INTO storage.objects(bucket_id,name) VALUES(''share-placement-photos'',%L)',:'a_uid'||'/'||:'b_request'||'/12345679-cross.png'),'42501','row-level security');
+SELECT gate1_checks.error('bad extension denied',format('INSERT INTO storage.objects(bucket_id,name) VALUES(''share-placement-photos'',%L)',:'a_uid'||'/'||:'a_request'||'/12345679-bad.gif'),'42501','row-level security');
+SELECT gate1_checks.ok('no member Storage update policy',NOT EXISTS(SELECT 1 FROM pg_policy WHERE polrelid='storage.objects'::regclass AND polcmd IN ('w','d','*')));
+DO $$ DECLARE n int;BEGIN
+ UPDATE storage.objects SET name=name||'.forbidden';GET DIAGNOSTICS n=ROW_COUNT;
+ PERFORM gate1_checks.ok('Storage UPDATE affects zero rows',n=0);
+ DELETE FROM storage.objects;GET DIAGNOSTICS n=ROW_COUNT;
+ PERFORM gate1_checks.ok('Storage DELETE affects zero rows',n=0);
+END $$;
+SELECT set_config('request.jwt.claim.sub',:'b_uid',true);
+SELECT gate1_checks.ok('B cannot see A new photo',(SELECT count(*)=1 AND bool_and(owner_id=auth.uid()::text) FROM storage.objects));
+SELECT gate1_checks.ok('B cannot see A details',(SELECT count(*)=1 AND bool_and(user_id=auth.uid()) FROM public.lx_share_draft_details));
+SELECT set_config('request.jwt.claim.sub','',true);
+SELECT gate1_checks.ok('null JWT uid sees no rows',NOT EXISTS(SELECT 1 FROM public.profiles) AND NOT EXISTS(SELECT 1 FROM public.lx_share_requests) AND NOT EXISTS(SELECT 1 FROM storage.objects));
+RESET ROLE;
+SET LOCAL ROLE anon;
+SELECT gate1_checks.error('anon profile denied','SELECT * FROM public.profiles','42501');
+SELECT gate1_checks.error('anon draft RPC denied','SELECT public.lx_create_share_draft()','42501');
+SELECT gate1_checks.ok('anon cannot read Storage rows',NOT EXISTS(SELECT 1 FROM storage.objects));
+RESET ROLE;
+SELECT jsonb_agg(to_jsonb(r) ORDER BY name) AS role_assertions FROM gate1_checks.results r;
+ROLLBACK;

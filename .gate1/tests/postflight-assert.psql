@@ -1,0 +1,11 @@
+\set ON_ERROR_STOP on
+\ir ../dev01b/postflight.sql
+DO $$ BEGIN
+ IF (SELECT submission_enabled OR agreement_version IS NOT NULL OR agreement_published_at IS NOT NULL FROM public.lx_share_submission_settings WHERE id=1) THEN RAISE EXCEPTION 'postflight settings not restored';END IF;
+ IF EXISTS(SELECT 1 FROM public.lx_share_bags) OR EXISTS(SELECT 1 FROM public.lx_share_agreement_versions) OR EXISTS(SELECT 1 FROM public.lx_approved_collection_points) OR EXISTS(SELECT 1 FROM public.lx_share_service_consents) THEN RAISE EXCEPTION 'postflight transaction artifacts remain';END IF;
+ IF (SELECT count(*) FROM public.lx_share_requests)<>2 OR EXISTS(SELECT 1 FROM public.lx_share_requests WHERE status<>'draft' OR submitted_at IS NOT NULL) THEN RAISE EXCEPTION 'postflight drafts not restored';END IF;
+ IF (SELECT count(*) FROM storage.objects)<>2 THEN RAISE EXCEPTION 'mock role test photo survived rollback';END IF;
+ IF has_function_privilege('authenticated','public.lx_submit_share_request(uuid,text,boolean,boolean,boolean)','EXECUTE') OR has_function_privilege('anon','public.lx_submit_share_request(uuid,text,boolean,boolean,boolean)','EXECUTE') OR has_function_privilege('authenticated','public.lx_attach_my_draft_placement(uuid,text,uuid,text,text)','EXECUTE') THEN RAISE EXCEPTION 'postflight ACL changed';END IF;
+ RAISE NOTICE 'PASS: fresh-connection postflight restores settings, drafts, Storage metadata and privileges';
+END $$;
+SELECT last_value,is_called FROM public.lx_share_bag_code_seq;

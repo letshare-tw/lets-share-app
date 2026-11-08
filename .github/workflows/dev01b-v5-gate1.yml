@@ -7,10 +7,10 @@ permissions:
   contents: read
 jobs:
   isolated-pg17:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
-        image: postgres:17
+        image: postgres:17.11
         env:
           POSTGRES_PASSWORD: gate1_local_only
           POSTGRES_DB: gate1
@@ -151,10 +151,10 @@ jobs:
             ledger-result.txt
             security-result.txt
   v5-pg17-migration:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
-        image: postgres:17
+        image: postgres:17.11
         env:
           POSTGRES_PASSWORD: gate1_local_only
           POSTGRES_DB: gate1_v5
@@ -211,7 +211,7 @@ jobs:
             v5-migration-result.txt
             v5-baseline-result.txt
   deno-runtime:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Verify pinned DEV-01B source inputs
@@ -235,3 +235,76 @@ jobs:
           path: |
             deno-version.txt
             deno-result.txt
+
+  v5-transaction-rls:
+    if: github.ref == 'refs/heads/test/dev01b-v5-gate1-20261108'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_PASSWORD: gate1_local_only
+          POSTGRES_DB: gate1_transaction
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d gate1_transaction"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGPASSWORD: gate1_local_only
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGDATABASE: gate1_transaction
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify original and additional source integrity
+        run: |
+          set -euo pipefail
+          sha256sum --check .gate1/SHA256SUMS
+          sha256sum --check .gate1/CI-SHA256SUMS
+          mkdir -p .gate1-artifacts
+      - name: Build PG17.11 synthetic Auth and Storage fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -c 'CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN;'
+          psql -X -v ON_ERROR_STOP=1 -f .gate1/dev01b/supabase_pg17_mock.sql
+          psql -X -v ON_ERROR_STOP=1 -f .gate1/dev01b/SECURITY-V5-REVIEW.sql |& tee .gate1-artifacts/migration.log
+          psql -X -v ON_ERROR_STOP=1 -Atc "SELECT has_function_privilege('authenticated','public.lx_attach_my_draft_placement(uuid,text,uuid,text,text)','EXECUTE')" | tee .gate1-artifacts/original-legacy-acl.txt
+          psql -X -v ON_ERROR_STOP=1 -f .gate1/tests/compatibility-fix.sql
+          psql -X -v ON_ERROR_STOP=1 -f .gate1/tests/assertions.sql
+          psql -X -v ON_ERROR_STOP=1 -f .gate1/tests/fixtures.sql |& tee .gate1-artifacts/fixtures.log
+      - name: Execute unchanged original transaction_test.psql
+        shell: bash
+        run: |
+          set -euo pipefail
+          source .gate1/tests/fixture-env.sh
+          psql -X -v ON_ERROR_STOP=1 -v a_uid="$a_uid" -v b_uid="$b_uid" -v a_request="$a_request" -v b_request="$b_request" -v a_photo="$a_photo" -v b_photo="$b_photo" -f .gate1/dev01b/transaction_test.psql |& tee .gate1-artifacts/original-transaction.log
+          psql -X -v ON_ERROR_STOP=1 -f .gate1/tests/postflight-assert.psql |& tee .gate1-artifacts/postflight-original.log
+      - name: Strict SQLSTATE successful submit and mid-write rollback assertions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .gate1/tests/build_strict_transaction.py
+          psql -X -v ON_ERROR_STOP=1 -f .gate1-artifacts/strict-transaction.psql |& tee .gate1-artifacts/strict-transaction.log
+          psql -X -v ON_ERROR_STOP=1 -f .gate1/tests/postflight-assert.psql |& tee .gate1-artifacts/postflight-strict.log
+      - name: Actual restricted-role Auth RLS Storage policy tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          source .gate1/tests/fixture-env.sh
+          psql -X -v ON_ERROR_STOP=1 -v a_uid="$a_uid" -v b_uid="$b_uid" -v a_request="$a_request" -v b_request="$b_request" -f .gate1/tests/rls.psql |& tee .gate1-artifacts/rls.log
+          psql -X -v ON_ERROR_STOP=1 -f .gate1/tests/postflight-assert.psql |& tee .gate1-artifacts/postflight-rls.log
+      - name: Execute scoped original cleanup and assert zero leftovers
+        shell: bash
+        run: |
+          set -euo pipefail
+          source .gate1/tests/fixture-env.sh
+          psql -X -v ON_ERROR_STOP=1 -v a_uid="$a_uid" -v b_uid="$b_uid" -v a_request="$a_request" -v b_request="$b_request" -f .gate1/dev01b/cleanup_drafts.psql |& tee .gate1-artifacts/cleanup.log
+          psql -X -v ON_ERROR_STOP=1 -f .gate1/tests/cleanup-assert.sql
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gate1-v5-transaction-rls
+          path: .gate1-artifacts/
