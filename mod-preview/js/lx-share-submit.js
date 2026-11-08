@@ -8,6 +8,11 @@ const SESSION_KEY='lx_supabase_auth_v066g';
 const previous=window.share;
 if(typeof previous!=='function')return;
 let generation=0,submitting=false,verifiedRequestId=null;
+const PENDING_KEY='lx_dev01b_pending_share_request';
+function pendingKey(userId){return PENDING_KEY+':'+userId}
+function rememberPending(requestId){const {id}=credentials();sessionStorage.setItem(pendingKey(id),requestId)}
+function savedPending(){const {id}=credentials();return sessionStorage.getItem(pendingKey(id))}
+function clearPending(){try{const {id}=credentials();sessionStorage.removeItem(pendingKey(id))}catch{}}
 function currentPanel(panel){return panel&&node('lx-submit-panel')===panel}
 function invalidate(message){const panel=node('lx-submit-panel');if(!panel)return;panel.dataset.ready='0';setEnabled(false);if(message)status(message)}
 function node(id){return document.getElementById(id)}
@@ -38,8 +43,12 @@ window.lxSubmitLoad=async function(){
  status('正在檢查分享草稿與正式提交資格…');
  try{
   const {id}=credentials();
+  const pending=savedPending();
+  if(pending){const bag=await findBag(pending);if(seq!==generation||!currentPanel(panel))return;
+   if(bag){showBag(bag);return}
+   status('有尚未確認結果的提交，請先使用「查詢提交結果」確認，勿重複提交。',true);return}
   const service=await api('rpc/lx_share_service_status',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
-  if(seq!==generation||!node('lx-submit-panel'))return;
+  if(seq!==generation||!currentPanel(panel))return;
   if(!service?.published||!service?.activated||!service?.version){status('正式分享協議尚未發布或尚未啟用，僅可儲存草稿。');return}
   // Read only: never call lx_create_share_draft here.
   const rows=await api('lx_share_requests?select=id,status&sharer_user_id=eq.'+encodeURIComponent(id)+'&status=eq.draft&limit=1');
@@ -67,6 +76,7 @@ window.lxSubmitNow=async function(){
   status('正在重新確認草稿資格…');
   const preflight=await api('rpc/lx_share_submission_preflight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_request_id:requestId})});
   if(!preflight?.ready||preflight.agreement_version!==version)throw Error('草稿或協議已變更，請重新檢查');
+  rememberPending(requestId);
   status('正在正式提交，請勿重複點擊…');
   const result=await api('rpc/lx_submit_share_request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
    p_request_id:requestId,p_agreement_version:version,p_transfer_agreed:true,p_no_return_agreed:true,p_recycling_agreed:true
@@ -74,7 +84,6 @@ window.lxSubmitNow=async function(){
   if(result!==requestId)throw Error('提交結果無法核對，請到會員中心查詢');
   const bag=await findBag(requestId);
   if(!bag)throw Error('申請已提交，但尚未查到分享袋。請聯絡客服，不要重複提交');
-  const deadline=new Date(bag.pickup_deadline_at);
   showBag(bag);
   panel.dataset.ready='0';panel.dataset.requestId='';
  }catch(err){
@@ -91,14 +100,19 @@ async function findBag(requestId){
 function showBag(bag){
  const deadline=new Date(bag.pickup_deadline_at);
  status('✓ 分享成功！袋號：'+bag.bag_code+'。取件截止：'+(Number.isNaN(deadline.getTime())?'請洽客服':deadline.toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}))+'（台灣時間）。等待總部安排騎手。');
- invalidate();verifiedRequestId=null;
+ invalidate();verifiedRequestId=null;clearPending();
 }
 window.lxSubmitRecover=async function(){
  try{
-  const id=verifiedRequestId||node('lx-submit-panel')?.dataset.requestId;
+  const id=savedPending()||verifiedRequestId||node('lx-submit-panel')?.dataset.requestId;
   const bag=await findBag(id);
   if(bag)showBag(bag);
-  else status('尚未查到分享袋。請先確認會員中心的分享紀錄，勿直接重複提交。',true);
+  else if(id){
+   const rows=await api('lx_share_requests?select=id,status&id=eq.'+encodeURIComponent(id)+'&limit=1');
+   if(rows?.[0]?.status==='draft'){
+    clearPending();status('已確認仍為草稿，尚未正式提交。請重新檢查資格後再操作。');
+   }else status('提交狀態尚未確認，請聯絡客服確認，勿重複送出。',true);
+  }else status('目前沒有待確認的提交。可在會員中心查詢歷史分享紀錄。');
  }catch(err){status('查詢失敗：'+err.message,true)}
 };
 // A saved draft invalidates the old preflight, even if its request ID remains unchanged.
