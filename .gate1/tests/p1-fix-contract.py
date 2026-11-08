@@ -10,7 +10,7 @@ checks={
  'no legacy placement RPC in V5': 'lx_attach_my_draft_placement' not in js,
  'V5 details upsert': 'lx_share_draft_details?on_conflict=request_id' in js,
  'V5 owner draft photo path': "state.uid+'/'+state.draft+'/'+Date.now()" in js,
- '300 KB compressed upload policy': 'PHOTO_MAX_BYTES=300*1024' in js and 'PHOTO_MAX_EDGE=1280' in js and "canvas.toBlob(resolve,'image/webp',quality)" in js and 'await upload(compressed,state.photo)' in js,
+ '300 KB compressed upload policy': 'PHOTO_MAX_BYTES=300000' in js and 'PHOTO_MAX_EDGE=1280' in js and "canvas.toBlob(resolve,'image/webp',quality)" in js and 'await upload(compressed,state.photo)' in js,
  'V5 storage private bucket': "bucket:'share-placement-photos'" in js,
  'preflight RPC': 'rpc/lx_share_submission_preflight' in js,
  'three explicit consent flags': all(x in js for x in ['transfer_agreed:true','no_return_agreed:true','recycling_agreed:true']),
