@@ -6,6 +6,7 @@ on:
 permissions:
   contents: read
   actions: read
+  statuses: write
 jobs:
   isolated-pg17:
     runs-on: ubuntu-24.04
@@ -470,14 +471,39 @@ jobs:
           pattern: gate1-*
           path: .gate1-evidence
       - name: Require all jobs and machine-readable assertions before declaring PASS
+        id: gate
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
           GH_TOKEN: ${{ github.token }}
         run: python3 .gate1/tests/report_gate.py
       - uses: actions/upload-artifact@v4
+        id: final_artifact
         if: always()
         with:
           include-hidden-files: true
           if-no-files-found: error
           name: gate1-final-report
           path: .gate1-final/
+      - name: Publish test-branch-only CI result and Actions Run URL to commit status
+        if: always() && github.ref == 'refs/heads/test/dev01b-v5-gate1-20261108'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          GH_RUN_ID: ${{ github.run_id }}
+          GATE_OUTCOME: ${{ steps.gate.outcome }}
+          ARTIFACT_OUTCOME: ${{ steps.final_artifact.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          state=failure
+          description='DEPLOY-03 Gate 1 did not pass; inspect Actions run'
+          if [[ "$GATE_OUTCOME" == success && "$ARTIFACT_OUTCOME" == success ]]; then
+            state=success
+            description='DEPLOY-03 Gate 1 report and evidence uploaded'
+          fi
+          echo "DEPLOY03_ACTIONS_RUN_URL=https://github.com/$GH_REPOSITORY/actions/runs/$GH_RUN_ID"
+          jq -n --arg state "$state" --arg target_url "https://github.com/$GH_REPOSITORY/actions/runs/$GH_RUN_ID" --arg description "$description" '{state:$state,target_url:$target_url,description:$description,context:"DEPLOY-03/Gate-1"}' > /tmp/deploy03-status.json
+          curl --fail-with-body --silent --show-error --retry 3 -X POST -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' -H 'Content-Type: application/json' --data-binary @/tmp/deploy03-status.json "https://api.github.com/repos/$GH_REPOSITORY/statuses/$GH_SHA"
+
