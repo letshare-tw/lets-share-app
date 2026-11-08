@@ -1,6 +1,6 @@
 // Isolated local browser E2E gateway: real Auth/Storage/PostgREST + Deno submissionHandler.
 import {admin,member,url,check,writeReport} from './context.ts';
-import {submissionHandler} from './edge-submit-handler.ts';
+
 const status=JSON.parse(await Deno.readTextFile('.gate1/local-stack/status.private.json'));
 const version='P1_LOCAL_BROWSER_ONLY';
 const email='p1-browser-'+crypto.randomUUID()+'@example.invalid',password=crypto.randomUUID()+'Aa1!';
@@ -20,7 +20,19 @@ const activated=await client.rpc('lx_activate_share_service',{p_agreement_versio
 check('browser fixture service activation',!activated.error,activated.error);
 const point=await admin.from('lx_approved_collection_points').insert({name:'P1 LOCAL TEST POINT',address_text:'臺南市本機測試路123號',enabled:true,approved_at:published}).select('id').single();
 check('browser fixture approved collection point',!point.error&&!!point.data,point.error);
-const handler=submissionHandler(member(),admin);
+// Import the actual Edge entrypoint and capture its Deno.serve handler, rather than
+// testing a duplicate wrapper. Credentials below belong only to the local stack.
+Deno.env.set('SUPABASE_URL',url);
+Deno.env.set('SUPABASE_ANON_KEY',status.ANON_KEY);
+Deno.env.set('SUPABASE_SERVICE_ROLE_KEY',status.SERVICE_ROLE_KEY);
+Deno.env.set('C09_ALLOWED_ORIGINS','http://127.0.0.1:8765');
+let handler:((req:Request)=>Promise<Response>)|undefined;
+const nativeServe=Deno.serve;
+Object.defineProperty(Deno,'serve',{configurable:true,value:(h:(req:Request)=>Promise<Response>)=>{handler=h;return {};}});
+try{await import('../../supabase/functions/share-submit/index.ts');}
+finally{Object.defineProperty(Deno,'serve',{configurable:true,value:nativeServe});}
+check('actual Edge entrypoint registered a handler',typeof handler==='function');
+
 let requestId='',photoPath='',bagId='',completed=false;
 const hostname='127.0.0.1',port=8765;
 const mime=(p:string)=>p.endsWith('.js')?'text/javascript; charset=utf-8':'text/html; charset=utf-8';
@@ -47,7 +59,7 @@ const server=Deno.serve({hostname,port,onListen:()=>console.log('P1_BROWSER_READ
   bagId=bag.data.id;completed=true;
   return Response.json({pass:true});
  }
- if(u.pathname==='/submit')return handler(req);
+ if(u.pathname==='/submit')return handler!(req);
  if(u.pathname.startsWith('/rest/v1/')||u.pathname.startsWith('/storage/v1/')||u.pathname.startsWith('/auth/v1/')){
   const target=new URL(url);target.pathname=u.pathname;target.search=u.search;
   const headers=new Headers(req.headers);headers.delete('host');
