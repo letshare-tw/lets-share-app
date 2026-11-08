@@ -7,6 +7,34 @@ permissions:
   contents: read
   statuses: write
 jobs:
+  gate2-local-browser-runtime:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check C09 V5 JavaScript runtime syntax
+        run: deno check app/c09-v5.js
+      - name: Install isolated headless Chromium
+        run: |
+          set -euo pipefail
+          npm install --no-save playwright@1.58.2
+          npx playwright install --with-deps chromium
+      - name: Exercise real Chromium C09 V5 fail-closed browser behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory app >/tmp/gate2-browser-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          node .gate1/tests/p1-browser.cjs | tee gate2-browser-runtime.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gate2-local-browser-evidence
+          path: gate2-browser-runtime.log
+          if-no-files-found: warn
   gate2-offline-readiness:
     runs-on: ubuntu-24.04
     steps:
