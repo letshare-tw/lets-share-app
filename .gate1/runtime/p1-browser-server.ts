@@ -37,6 +37,11 @@ const server=Deno.serve({hostname,port,onListen:()=>console.log('P1_BROWSER_READ
   check('browser submitted real request',!reqRow.error&&reqRow.data.status==='submitted',reqRow.error);
   check('browser stored real draft details',!detail.error&&detail.data.user_id===uid&&detail.data.clothing_count===2,detail.error);
   check('browser uploaded actual Storage photo',!obj.error,obj.error);
+  const stored=await admin.storage.from('share-placement-photos').download(photoPath);
+  check('browser downloaded actual stored photo',!stored.error&&!!stored.data,stored.error);
+  const actualBytes=(await stored.data!.arrayBuffer()).byteLength;
+  check('browser stored actual photo <= 300000 bytes',actualBytes>0&&actualBytes<=300000,{actualBytes});
+  check('browser stored WebP file signature',photoPath.endsWith('.webp'));
   check('browser created one actual bag',!bag.error&&!!bag.data,bag.error);
   check('browser 48h deadline exact',Date.parse(bag.data.pickup_deadline_at)-Date.parse(bag.data.declared_at)===172800000);
   bagId=bag.data.id;completed=true;
