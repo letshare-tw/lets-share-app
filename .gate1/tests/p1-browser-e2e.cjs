@@ -14,7 +14,7 @@ const {chromium}=require('playwright');
   await page.goto('http://127.0.0.1:8765/c09-v5.html');
   await page.waitForFunction(()=>document.querySelector('#identity')?.textContent?.includes('已登入'),null,{timeout:10000}).catch(async e=>{console.error('IDENTITY_DEBUG',await page.locator('#identity').innerText(),'STATUS_DEBUG',await page.locator('#status').innerText());throw e;});
   await page.locator('input[name="kind"][value="collection_point"]').check();
-  await page.waitForFunction(()=>document.querySelector('#pointSelect')?.options.length>1,null,{timeout:20000});
+  await page.waitForFunction(()=>document.querySelector('#pointSelect')?.options.length>1,null,{timeout:12000}).catch(async e=>{console.error('POINTS_DEBUG',await page.locator('#status').innerText(),await page.locator('#pointSelect').innerHTML());throw e;});
   await page.locator('#pointSelect').selectOption({index:1});
   await page.locator('#photo').setInputFiles({name:'photo.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlSQG8AAAAASUVORK5CYII=','base64')});
   await page.locator('#placed').check();
