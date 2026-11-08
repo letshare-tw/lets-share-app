@@ -18,6 +18,8 @@ const setting=await admin.from('lx_share_submission_settings').update({submissio
 check('browser fixture submit enabled',!setting.error,setting.error);
 const activated=await client.rpc('lx_activate_share_service',{p_agreement_version:version,p_explicit_agreement:true});
 check('browser fixture service activation',!activated.error,activated.error);
+const point=await admin.from('lx_approved_collection_points').insert({name:'P1 LOCAL TEST POINT',address_text:'臺南市本機測試路123號',enabled:true,approved_at:published}).select('id').single();
+check('browser fixture approved collection point',!point.error&&!!point.data,point.error);
 const handler=submissionHandler(member(),admin);
 let requestId='',photoPath='',bagId='',completed=false;
 const hostname='127.0.0.1',port=8765;
@@ -56,6 +58,7 @@ try{
 }finally{
  if(photoPath){const x=await admin.storage.from('share-placement-photos').remove([photoPath]);check('browser photo cleanup',!x.error,x.error);}
  if(requestId){if(bagId){const x=await admin.from('lx_share_bags').delete().eq('id',bagId);check('browser bag cleanup',!x.error,x.error);}const x=await admin.from('lx_share_requests').delete().eq('id',requestId);check('browser draft cleanup',!x.error,x.error);}
+ if(point.data?.id){const x=await admin.from('lx_approved_collection_points').delete().eq('id',point.data.id);check('browser collection point cleanup',!x.error,x.error);}
  const closed=await admin.from('lx_share_submission_settings').update({submission_enabled:false,agreement_version:null,agreement_published_at:null}).eq('id',1);check('browser gate closed after test',!closed.error,closed.error);
  const gone=await admin.from('lx_share_agreement_versions').delete().eq('version',version);check('browser agreement cleanup',!gone.error,gone.error);
  const removed=await admin.auth.admin.deleteUser(uid);check('browser Auth cleanup',!removed.error,removed.error);
