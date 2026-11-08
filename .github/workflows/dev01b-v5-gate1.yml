@@ -409,7 +409,7 @@ jobs:
         run: supabase stop --workdir .gate1/local-stack --no-backup
 
   p1-fix-c09-v5:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Verify isolated C09 V5 browser contract
