@@ -309,3 +309,87 @@ jobs:
         with:
           name: gate1-v5-transaction-rls
           path: .gate1-artifacts/
+
+  local-supabase-api:
+    if: github.ref == 'refs/heads/test/dev01b-v5-gate1-20261108'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify source integrity and enforce no hosted credentials
+        run: |
+          set -euo pipefail
+          test -z "${SUPABASE_ACCESS_TOKEN:-}"
+          sha256sum --check .gate1/SHA256SUMS
+          sha256sum --check .gate1/CI-SHA256SUMS
+          mkdir -p .gate1-artifacts
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 3.0.0
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.6
+      - name: Start completely local Supabase Auth PostgREST Storage stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase init --workdir .gate1/local-stack
+          python3 .gate1/runtime/prepare_local.py config
+          set +e
+          supabase start --workdir .gate1/local-stack --exclude studio,imgproxy,postgres-meta,edge-runtime,logflare,vector,supavisor,realtime > .gate1/local-stack/start.private.log 2>&1
+          rc=$?
+          set -e
+          python3 .gate1/runtime/prepare_local.py redact
+          cat .gate1-artifacts/local-stack-start.log
+          test "$rc" -eq 0
+          supabase status --workdir .gate1/local-stack -o json > .gate1/local-stack/status.private.json
+          python3 .gate1/runtime/prepare_local.py env >> "$GITHUB_ENV"
+      - name: Apply real local schema ledger and reviewed supplements
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -Atc 'SHOW server_version' | tee .gate1-artifacts/local-db-version.txt
+          test "$(psql -X -Atc 'SHOW server_version_num')" -ge 170000
+          test "$(psql -X -Atc 'SHOW server_version_num')" -lt 180000
+          psql -X -v ON_ERROR_STOP=1 -f .gate1/dev01b/SECURITY-V5-REVIEW.sql |& tee .gate1-artifacts/local-v5-migration.log
+          psql -X -v ON_ERROR_STOP=1 -f .gate1/tests/compatibility-fix.sql
+          psql -X -v ON_ERROR_STOP=1 -f .gate1/dev01b/ledger_design.sql
+          psql -X -v ON_ERROR_STOP=1 -f .gate1/runtime/internal-submit.sql
+          psql -X -v ON_ERROR_STOP=1 -f .gate1/runtime/local-ledger-fixture.sql
+          psql -X -v ON_ERROR_STOP=1 -c "NOTIFY pgrst, 'reload schema';"
+          deno check .gate1/runtime/fixtures.ts .gate1/runtime/submit_api.ts .gate1/dev01b/index.ts
+          deno cache .gate1/runtime/fixtures.ts .gate1/runtime/submit_api.ts .gate1/dev01b/index.ts
+      - name: Real Auth Storage original Edge input authorization retry tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          deno run --cached-only --no-prompt --deny-net=rfwqcrvxyjhtmafnbuyy.supabase.co --allow-net=127.0.0.1,localhost --allow-env --allow-read=.gate1 --allow-write=.gate1-artifacts,.gate1/local-stack .gate1/runtime/fixtures.ts prepare |& tee .gate1-artifacts/original-edge-fixtures.log
+          python3 .gate1/runtime/prepare_local.py fixture-env
+      - name: Execute transaction assertions against actual local Auth Storage fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          source .gate1/local-stack/fixture.env
+          python3 .gate1/tests/prepare_original_transaction.py
+          psql -X -v ON_ERROR_STOP=1 -v a_uid="$a_uid" -v b_uid="$b_uid" -v a_request="$a_request" -v b_request="$b_request" -v a_photo="$a_photo" -v b_photo="$b_photo" -f .gate1-artifacts/transaction-ci.psql |& tee .gate1-artifacts/local-transaction.log
+          psql -X -v ON_ERROR_STOP=1 -f .gate1/tests/postflight-assert.psql |& tee .gate1-artifacts/local-postflight-transaction.log
+          psql -X -v ON_ERROR_STOP=1 -v a_uid="$a_uid" -v b_uid="$b_uid" -v a_request="$a_request" -v b_request="$b_request" -f .gate1/dev01b/cleanup_drafts.psql |& tee .gate1-artifacts/local-draft-cleanup.log
+      - name: Original Edge cleanup recovery and durable manifest verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          deno run --cached-only --no-prompt --deny-net=rfwqcrvxyjhtmafnbuyy.supabase.co --allow-net=127.0.0.1,localhost --allow-env --allow-read=.gate1 --allow-write=.gate1-artifacts,.gate1/local-stack .gate1/runtime/fixtures.ts cleanup |& tee .gate1-artifacts/original-edge-cleanup.log
+      - name: Real loopback HTTP member submission success denial retry concurrency
+        shell: bash
+        run: |
+          set -euo pipefail
+          deno run --cached-only --no-prompt --deny-net=rfwqcrvxyjhtmafnbuyy.supabase.co --allow-net=127.0.0.1,localhost --allow-env --allow-read=.gate1 --allow-write=.gate1-artifacts,.gate1/local-stack .gate1/runtime/submit_api.ts |& tee .gate1-artifacts/submit-http-api.log
+          psql -X -v ON_ERROR_STOP=1 -f .gate1/runtime/local-postflight.sql |& tee .gate1-artifacts/local-final-postflight.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gate1-local-supabase-api
+          path: .gate1-artifacts/
+      - name: Destroy local containers and volumes
+        if: always()
+        run: supabase stop --workdir .gate1/local-stack --no-backup
