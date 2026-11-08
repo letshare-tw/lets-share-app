@@ -419,6 +419,15 @@ jobs:
           deno-version: v2.x
       - name: Check browser module syntax
         run: deno check app/c09-v5.js
+      - name: Install headless Chromium for real browser safety test
+        run: |
+          npm install --no-save playwright@1.58.2
+          npx playwright install --with-deps chromium
+      - name: Run real Chromium C09 V5 fail-closed UI test
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory app >/tmp/p1-http.log 2>&1 &
+          node .gate1/tests/p1-browser.cjs
+
 
   gate1-result:
     if: always() && github.ref == 'refs/heads/test/dev01b-v5-gate1-20261108'
