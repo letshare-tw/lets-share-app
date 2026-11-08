@@ -2,7 +2,7 @@
 import type {SupabaseClient} from 'npm:@supabase/supabase-js@2.95.0';
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const reply=(status:number,value:unknown)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
-export function submissionHandler(auth:SupabaseClient,service:SupabaseClient,submitRpc='gate1_internal_submit'){
+export function submissionHandler(auth:SupabaseClient,service:SupabaseClient){
  return async(req:Request):Promise<Response>=>{
   if(req.method!=='POST')return reply(405,{error:'method_not_allowed'});
   const token=(req.headers.get('authorization')??'').match(/^Bearer (.+)$/)?.[1];
@@ -30,7 +30,7 @@ export function submissionHandler(auth:SupabaseClient,service:SupabaseClient,sub
   };
   if(current.data.status==='submitted'){const r=await receipt();return r?reply(200,{...r,replayed:true}):reply(409,{error:'conflict'});}
   if(current.data.status!=='draft')return reply(409,{error:'not_draft'});
-  const result=await service.rpc(submitRpc,{p_user:uid,p_request:body.request_id,p_version:body.agreement_version,p_transfer:true,p_no_return:true,p_recycling:true});
+  const result=await service.rpc('gate1_internal_submit',{p_user:uid,p_request:body.request_id,p_version:body.agreement_version,p_transfer:true,p_no_return:true,p_recycling:true});
   if(result.error){const replay=await receipt();if(replay)return reply(200,{...replay,replayed:true});return reply(result.error.code==='P0001'||result.error.code==='P0002'?422:503,{error:'request_rejected'});}
   const r=await receipt();return r?reply(200,{...r,replayed:false}):reply(503,{error:'receipt_unavailable'});
  };
