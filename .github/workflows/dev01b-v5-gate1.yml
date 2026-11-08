@@ -364,6 +364,7 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f .gate1/tests/compatibility-fix.sql
           psql -X -v ON_ERROR_STOP=1 -f .gate1/dev01b/ledger_design.sql
           psql -X -v ON_ERROR_STOP=1 -f .gate1/runtime/internal-submit.sql
+          psql -X -v ON_ERROR_STOP=1 -f .gate1/runtime/edge-submit-candidate.sql
           psql -X -v ON_ERROR_STOP=1 -f .gate1/runtime/local-ledger-fixture.sql
           psql -X -v ON_ERROR_STOP=1 -c "NOTIFY pgrst, 'reload schema';"
           deno check .gate1/runtime/fixtures.ts .gate1/runtime/submit_api.ts .gate1/runtime/windows.ts .gate1/dev01b/index.ts
