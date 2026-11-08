@@ -13,6 +13,9 @@ def json_line(path,key=None):
   try:value=json.loads(line.strip())
   except ValueError:continue
   if key and isinstance(value,dict) and key in value:return value[key]
+  # psql prints the JSON cell itself, not the column-name wrapper returned by
+  # a database connector. Require the strict result's identifying fields.
+  if key=='submission_validation' and isinstance(value,dict) and {'tests','sequence_before','sequence_after','inside_counts'}<=value.keys():return value
   if key is None and isinstance(value,list):return value
  raise AssertionError('Missing machine-readable result '+str(path))
 if not failures:
