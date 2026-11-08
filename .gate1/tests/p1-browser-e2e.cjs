@@ -97,8 +97,9 @@ const {chromium}=require('playwright');
    method:'POST',headers:{'Content-Type':'application/json',apikey:fixture.key,Authorization:'Bearer '+fixture.token},
    body:JSON.stringify({p_user:fixture.uid,p_request:body.request_id,p_version:fixture.version,p_transfer:true,p_no_return:true,p_recycling:true})
   });
-  if(direct.ok)throw Error('SECURITY: authenticated member executed service-only RPC');
-  console.log('PASS authenticated member cannot invoke service-only RPC',direct.status);
+  const directResult=await direct.json();
+  if(direct.status!==403||directResult.code!=='42501')throw Error('SECURITY: member RPC denial must be SQL permission denied (42501/403): '+JSON.stringify({status:direct.status,code:directResult.code??null}));
+  console.log('PASS authenticated member cannot invoke service-only RPC',direct.status,directResult.code);
   const foreign=await post(fixture.otherToken);
   if(foreign.status!==404)throw Error('Edge cross-user request must reject: '+JSON.stringify(foreign));
   console.log('PASS actual Edge entry rejects cross-account request');
