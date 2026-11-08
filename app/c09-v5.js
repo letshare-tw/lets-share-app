@@ -100,10 +100,18 @@ async function init(){
  if(!CONFIG.key){note('安全鎖定：未設定測試專案 publishable key，本頁不會連線或寫入資料');$('save').disabled=true;return;}
  try{
   const home=await request('rpc/lx_get_my_home_address',{});const item=Array.isArray(home)?home[0]:home;
-  state.address=item?.address_text||'';$('address').textContent=state.address||'尚未設定住家地址';
+  state.address=item?.address_text||'';
+ }catch(e){
+  // Local V5 schema has no legacy home-address RPC; use the member's own RLS-protected profile.
+  try{const profiles=await request('profiles?select=home_address&id=eq.'+state.uid);
+   state.address=profiles?.[0]?.home_address||'';
+  }catch(profileError){note('住家地址讀取失敗：'+profileError.message);}
+ }
+ $('address').textContent=state.address||'尚未設定住家地址';
+ try{
   state.points=await request('lx_approved_collection_points?select=id,name,address_text,placement_note&enabled=eq.true&order=name.asc');
   for(const p of state.points){const option=document.createElement('option');option.value=p.id;option.textContent=p.name;$('pointSelect').append(option);}
- }catch(e){note('初始化失敗：'+e.message);}
+ }catch(e){note('集貨點讀取失敗：'+e.message);}
 }
 document.querySelectorAll('input[name="kind"]').forEach(el=>el.addEventListener('change',()=>{
  const home=kind()==='home';$('home').classList.toggle('hidden',!home);$('point').classList.toggle('hidden',home);
