@@ -24,7 +24,7 @@ const fs=require('fs');
  await page.goto('http://127.0.0.1:8765/c09-v5.html');
  await page.locator('#photo').setInputFiles({name:'photo.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlSQG8AAAAASUVORK5CYII=','base64')});
  await page.locator('#placed').check();
- await page.locator('#save').click();
+ if(await page.locator('#save').isEnabled())throw Error('Save must be disabled without configured test key');
  await page.waitForTimeout(200);
  const message=await page.locator('#status').innerText();
  if(!message.includes('安全鎖定')&&!message.includes('尚未設定測試專案金鑰'))throw Error('Expected safe disabled configuration, got '+message);
