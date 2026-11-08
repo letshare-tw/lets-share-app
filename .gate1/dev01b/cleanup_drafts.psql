@@ -1,0 +1,41 @@
+-- REVIEW ONLY. DESTRUCTIVE even though limited. Run ONLY after separate explicit authorization.
+-- Required: a_uid, b_uid, a_request, b_request from signed test manifest.
+-- Stop if any request submitted, bag exists, or IDs do not match owners.
+\set ON_ERROR_STOP on
+BEGIN;
+SET LOCAL lock_timeout='3s';
+SET LOCAL statement_timeout='15s';
+SELECT set_config('dev01b.a_uid', :'a_uid',true),set_config('dev01b.b_uid', :'b_uid',true),set_config('dev01b.a_request', :'a_request',true),set_config('dev01b.b_request', :'b_request',true);
+DO $$ DECLARE a uuid:=current_setting('dev01b.a_uid')::uuid;b uuid:=current_setting('dev01b.b_uid')::uuid;ra uuid:=current_setting('dev01b.a_request')::uuid;rb uuid:=current_setting('dev01b.b_request')::uuid;BEGIN
+ IF a=b OR ra=rb THEN RAISE EXCEPTION 'STOP duplicate fixture identifiers';END IF;
+ IF (SELECT count(*) FROM public.lx_share_requests WHERE (id=ra AND sharer_user_id=a AND status='draft') OR (id=rb AND sharer_user_id=b AND status='draft'))<>2 THEN RAISE EXCEPTION 'STOP: fixture ownership/state mismatch';END IF;
+ IF EXISTS(SELECT 1 FROM public.lx_share_bags WHERE share_request_id IN (ra,rb)) THEN RAISE EXCEPTION 'STOP: bag exists';END IF;
+ IF EXISTS(SELECT 1 FROM public.lx_share_requests WHERE sharer_user_id IN (a,b) AND id NOT IN (ra,rb)) THEN RAISE EXCEPTION 'STOP: extra requests owned by test users';END IF;
+END $$;
+-- Delete precisely two owned drafts in one transaction; abort on any mismatch.
+-- Explicitly delete dependent details as well as placements; do not rely on cascade.
+DO $$
+DECLARE ra uuid:=current_setting('dev01b.a_request')::uuid;
+        rb uuid:=current_setting('dev01b.b_request')::uuid;
+        a uuid:=current_setting('dev01b.a_uid')::uuid;
+        b uuid:=current_setting('dev01b.b_uid')::uuid;
+        n integer;
+BEGIN
+ DELETE FROM public.lx_share_draft_placements WHERE request_id IN (ra,rb);
+ DELETE FROM public.lx_share_draft_details WHERE request_id IN (ra,rb);
+ DELETE FROM public.lx_share_requests
+ WHERE (id=ra AND sharer_user_id=a AND status='draft')
+    OR (id=rb AND sharer_user_id=b AND status='draft');
+ GET DIAGNOSTICS n = ROW_COUNT;
+ IF n <> 2 THEN RAISE EXCEPTION 'STOP: expected exactly 2 draft deletions, got %', n; END IF;
+END $$;
+
+-- Atomic guard: verify precisely two deletions (and no unexpected drafts) before commit.
+DO $$ DECLARE a uuid:=current_setting('dev01b.a_uid')::uuid;b uuid:=current_setting('dev01b.b_uid')::uuid;ra uuid:=current_setting('dev01b.a_request')::uuid;rb uuid:=current_setting('dev01b.b_request')::uuid;BEGIN
+ IF EXISTS(SELECT 1 FROM public.lx_share_requests WHERE id IN (ra,rb)) THEN RAISE EXCEPTION 'STOP: fixture requests remain'; END IF;
+ IF EXISTS(SELECT 1 FROM public.lx_share_draft_placements WHERE request_id IN (ra,rb)) THEN RAISE EXCEPTION 'STOP: placements remain'; END IF;
+ IF EXISTS(SELECT 1 FROM public.lx_share_draft_details WHERE request_id IN (ra,rb)) THEN RAISE EXCEPTION 'STOP: details remain'; END IF;
+END $$;
+COMMIT;
+-- psql -X -v ON_ERROR_STOP=1 -v a_uid=... -v b_uid=... -v a_request=... -v b_request=... -f cleanup_drafts.psql
+-- WARNING: run only after explicitly authorized cleanup; verify postflight and transaction exit code.
