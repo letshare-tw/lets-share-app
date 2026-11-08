@@ -33,12 +33,18 @@ try{await import('../../supabase/functions/share-submit/index.ts');}
 finally{Object.defineProperty(Deno,'serve',{configurable:true,value:nativeServe});}
 check('actual Edge entrypoint registered a handler',typeof handler==='function');
 
+const otherEmail='p1-other-'+crypto.randomUUID()+'@example.invalid',otherPassword=crypto.randomUUID()+'Aa1!';
+const other=await admin.auth.admin.createUser({email:otherEmail,password:otherPassword,email_confirm:true});
+check('cross-account fixture created',!other.error&&!!other.data.user,other.error);
+const otherClient=member();
+const otherLogin=await otherClient.auth.signInWithPassword({email:otherEmail,password:otherPassword});
+check('cross-account fixture real JWT',!otherLogin.error&&!!otherLogin.data.session,otherLogin.error);
 let requestId='',photoPath='',bagId='',completed=false;
 const hostname='127.0.0.1',port=8765;
 const mime=(p:string)=>p.endsWith('.js')?'text/javascript; charset=utf-8':'text/html; charset=utf-8';
 const server=Deno.serve({hostname,port,onListen:()=>console.log('P1_BROWSER_READY')},async req=>{
  const u=new URL(req.url);
- if(u.pathname==='/__fixture')return Response.json({token:login.data.session!.access_token,key:status.ANON_KEY,uid,version});
+ if(u.pathname==='/__fixture')return Response.json({token:login.data.session!.access_token,key:status.ANON_KEY,uid,version,otherToken:otherLogin.data.session!.access_token});
  if(u.pathname==='/__verify'&&req.method==='POST'){
   const body=await req.json();
   requestId=body.request_id;photoPath=body.photo_path;
@@ -77,6 +83,7 @@ try{
  if(requestId){if(bagId){const x=await admin.from('lx_share_bags').delete().eq('id',bagId);check('browser bag cleanup',!x.error,x.error);}const x=await admin.from('lx_share_requests').delete().eq('id',requestId);check('browser draft cleanup',!x.error,x.error);}
  if(point.data?.id){const x=await admin.from('lx_approved_collection_points').delete().eq('id',point.data.id);check('browser collection point cleanup',!x.error,x.error);}
  const closed=await admin.from('lx_share_submission_settings').update({submission_enabled:false,agreement_version:null,agreement_published_at:null}).eq('id',1);check('browser gate closed after test',!closed.error,closed.error);
+ const otherRemoved=await admin.auth.admin.deleteUser(other.data.user!.id);check('browser other Auth cleanup',!otherRemoved.error,otherRemoved.error);
  const removed=await admin.auth.admin.deleteUser(uid);check('browser Auth cleanup',!removed.error,removed.error);
  const gone=await admin.from('lx_share_agreement_versions').delete().eq('version',version);check('browser agreement cleanup',!gone.error,gone.error);
  await server.shutdown();
