@@ -397,6 +397,11 @@ jobs:
           set -euo pipefail
           deno run --cached-only --no-prompt --deny-net=rfwqcrvxyjhtmafnbuyy.supabase.co --allow-net=127.0.0.1,localhost --allow-env --allow-read=.gate1,.gate1-artifacts/local-fixture-manifest.json --allow-write=.gate1-artifacts,.gate1/local-stack .gate1/runtime/submit_api.ts |& tee .gate1-artifacts/submit-http-api.log
           psql -X -v ON_ERROR_STOP=1 -f .gate1/runtime/local-postflight.sql |& tee .gate1-artifacts/local-final-postflight.log
+      - name: PHOTO-001 isolated Storage 300000-byte hard limit boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          deno run --no-prompt --deny-net=rfwqcrvxyjhtmafnbuyy.supabase.co --allow-net=127.0.0.1,localhost --allow-env --allow-read=.gate1 --allow-write=.gate1-artifacts .gate1/runtime/photo001-storage-limit.ts |& tee .gate1-artifacts/photo001-storage-limit.log
       - name: Real Chromium C09 V5 end-to-end on isolated local Supabase
         shell: bash
         run: |
