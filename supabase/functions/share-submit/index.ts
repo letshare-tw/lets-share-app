@@ -9,7 +9,7 @@ const secret=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 if(!url||!anon||!secret)throw Error('Missing server-side Supabase configuration');
 const auth=createClient(url,anon,{auth:{persistSession:false,autoRefreshToken:false}});
 const service=createClient(url,secret,{auth:{persistSession:false,autoRefreshToken:false}});
-const handle=submissionHandler(auth,service);
+const handle=submissionHandler(auth,service,'lx_edge_submit_share_request');
 const origins=(Deno.env.get('C09_ALLOWED_ORIGINS')||'').split(',').map(s=>s.trim()).filter(Boolean);
 Deno.serve(async request=>{
  const origin=request.headers.get('origin');
