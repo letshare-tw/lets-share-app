@@ -72,6 +72,40 @@ jobs:
             IF NOT has_function_privilege('service_role','public.dev01b_v5_claim(text,uuid,boolean)','EXECUTE') THEN RAISE EXCEPTION 'service role missing grant'; END IF;
           END $$;
           SQL
+          psql -X -v ON_ERROR_STOP=1 <<'SQL'
+          BEGIN;
+          INSERT INTO dev01b_test.runs(run_id,create_until,cleanup_until)
+          VALUES ('dev01b-v5-0123456789abcdef',now()+interval '10 minutes',now()+interval '20 minutes');
+          DO $
+          DECLARE
+            owner_id uuid := '11111111-1111-4111-8111-111111111111';
+            other_id uuid := '22222222-2222-4222-8222-222222222222';
+            fence bigint;
+            resource_count integer;
+          BEGIN
+            fence := public.dev01b_v5_claim('dev01b-v5-0123456789abcdef',owner_id,false);
+            IF fence <> 1 THEN RAISE EXCEPTION 'first fence token incorrect'; END IF;
+            PERFORM public.dev01b_v5_renew('dev01b-v5-0123456789abcdef',owner_id,fence);
+            PERFORM public.dev01b_v5_event('dev01b-v5-0123456789abcdef',owner_id,fence,
+              '33333333-3333-4333-8333-333333333333','intent','draft','a','draft-fixture','intent');
+            SELECT count(*) INTO resource_count FROM dev01b_test.resources
+              WHERE run_id='dev01b-v5-0123456789abcdef' AND state='intent';
+            IF resource_count <> 1 THEN RAISE EXCEPTION 'resource ledger intent not recorded'; END IF;
+            BEGIN
+              PERFORM public.dev01b_v5_renew('dev01b-v5-0123456789abcdef',other_id,fence);
+              RAISE EXCEPTION 'wrong lease owner was accepted';
+            EXCEPTION WHEN OTHERS THEN
+              IF SQLERRM <> 'lease_stale_or_expired' THEN RAISE; END IF;
+            END;
+            PERFORM public.dev01b_v5_release('dev01b-v5-0123456789abcdef',owner_id,fence);
+          END $;
+          ROLLBACK;
+          DO $
+          BEGIN
+            IF EXISTS(SELECT 1 FROM dev01b_test.runs WHERE run_id='dev01b-v5-0123456789abcdef')
+              THEN RAISE EXCEPTION 'fixture survived rollback'; END IF;
+          END $;
+          SQL
           echo 'PASS: V5 ledger migration and basic grants' | tee ledger-result.txt
       - uses: actions/upload-artifact@v4
         if: always()
