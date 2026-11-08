@@ -14,9 +14,9 @@ const origins=(Deno.env.get('C09_ALLOWED_ORIGINS')||'').split(',').map(s=>s.trim
 Deno.serve(async request=>{
  const origin=request.headers.get('origin');
  if(origin&&!origins.includes(origin))return Response.json({error:'origin_not_allowed'},{status:403});
- const cors=origin?{'Access-Control-Allow-Origin':origin,'Vary':'Origin'}:{};
- if(request.method==='OPTIONS')return new Response(null,{status:204,headers:{...cors,'Access-Control-Allow-Methods':'POST, OPTIONS','Access-Control-Allow-Headers':'authorization, content-type, apikey'}});
+ const cors=new Headers();if(origin){cors.set('Access-Control-Allow-Origin',origin);cors.set('Vary','Origin');}
+ if(request.method==='OPTIONS')return new Response(null,{status:204,headers:(()=>{const h=new Headers(cors);h.set('Access-Control-Allow-Methods','POST, OPTIONS');h.set('Access-Control-Allow-Headers','authorization, content-type, apikey');return h;})()});
  const response=await handle(request);
- const headers=new Headers(response.headers);for(const [k,v] of Object.entries(cors))headers.set(k,v);
+ const headers=new Headers(response.headers);for(const [k,v] of cors.entries())headers.set(k,v);
  return new Response(response.body,{status:response.status,headers});
 });
